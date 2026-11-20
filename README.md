@@ -12,6 +12,7 @@ Paper 1.21.11 economy plugin for the school SMP. Java 21 required.
 - `/balance` shows both currencies.
 - `/currency give <player> <lefta|shards> <amount>` (operator permission).
 - Tab list header/footer and live sidebar scoreboard.
+- Optional PlaceholderAPI placeholders: `%psiromouna_lefta%` and `%psiromouna_shards%`.
 
 ## Build
 Run `gradle build`. Install `build/libs/PsiromounaSMP-0.1.0.jar` in Paper's `plugins` folder.
