@@ -20,4 +20,5 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: PsiromounaSMP-0.2.0
-          path: build/libs/PsiromounaSMP-0.1.0.jar
+          path: build/libs/PsiromounaSMP-0.2.0.jar
+          if-no-files-found: error
