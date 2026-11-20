@@ -1,5 +1,5 @@
 name: PsiromounaSMP
-version: 0.1.0
+version: 0.2.0
 main: com.psiromouna.smp.PsiromounaSMP
 api-version: '1.21'
 softdepend: [PlaceholderAPI]
@@ -11,8 +11,9 @@ commands:
     description: Sell items for Lefta.
     usage: /sell [hand|all]
   shop:
-    description: Open the Lefta and Shard shops.
-    usage: /shop
+    description: Open the item shop.
+    aliases: [buy]
+    usage: /buy
   ah:
     description: Player auction house.
     usage: /ah [sell <price>|buy <id>|cancel <id>]
