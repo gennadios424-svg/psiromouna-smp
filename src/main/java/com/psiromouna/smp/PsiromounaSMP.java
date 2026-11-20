@@ -67,6 +67,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         saveDefaultConfig();
         openDatabase();
         getServer().getPluginManager().registerEvents(this, this);
+        if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) new EconomyExpansion(this).register();
         for (String name : List.of("worth", "sell", "shop", "ah", "balance", "currency")) {
             PluginCommand cmd = getCommand(name);
             if (cmd != null) cmd.setTabCompleter(this);
@@ -101,6 +102,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
             ps.setString(1, id.toString()); ps.executeUpdate();
         } catch (SQLException e) { getLogger().warning(e.getMessage()); }
     }
+    public double placeholderBalance(UUID id, String currency) { return getBalance(id, currency); }
     private double getBalance(UUID id, String currency) {
         ensureAccount(id);
         try (PreparedStatement ps = db.prepareStatement("SELECT " + (currency.equals("shards") ? "shards" : "lefta") + " FROM balances WHERE uuid=?")) {
