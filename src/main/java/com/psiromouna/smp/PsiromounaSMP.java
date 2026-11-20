@@ -70,13 +70,19 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         openDatabase();
         getServer().getPluginManager().registerEvents(this, this);
         if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) new EconomyExpansion(this).register();
-        for (String name : List.of("worth", "sell", "shop", "ah", "balance", "currency")) {
+        for (String name : List.of("worth", "sell", "shop", "buy", "ah", "balance", "currency")) {
             PluginCommand cmd = getCommand(name);
             if (cmd != null) cmd.setTabCompleter(this);
         }
         displayTask = Bukkit.getScheduler().runTaskTimer(this, () -> {
             for (Player p : Bukkit.getOnlinePlayers()) updateDisplays(p);
         }, 20L, 40L);
+        Bukkit.getScheduler().runTaskTimer(this, () -> {
+            for (Player p : Bukkit.getOnlinePlayers()) {
+                changeBalance(p.getUniqueId(), "shards", 3);
+                p.sendMessage(ChatColor.AQUA + "+3 Shards " + ChatColor.GRAY + "(5 minutes online)");
+            }
+        }, 6000L, 6000L);
         getLogger().info("Psiromouna SMP economy enabled.");
     }
 
@@ -123,7 +129,29 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         String[] bits = m.name().toLowerCase(Locale.ROOT).split("_");
         return Arrays.stream(bits).map(s -> Character.toUpperCase(s.charAt(0)) + s.substring(1)).collect(Collectors.joining(" "));
     }
-    private double worth(Material m) { return getConfig().getDouble("prices." + m.name(), DEFAULT_PRICES.getOrDefault(m, 0.0)); }
+    private double worth(Material m) {
+        if (getConfig().contains("prices." + m.name())) return getConfig().getDouble("prices." + m.name());
+        if (DEFAULT_PRICES.containsKey(m)) return DEFAULT_PRICES.get(m);
+        if (m.isAir() || !m.isItem()) return 0;
+        String n=m.name();
+        if (n.contains("ELYTRA")) return 2500;
+        if (n.contains("NETHERITE")) return 350;
+        if (n.contains("TOTEM")) return 900;
+        if (n.contains("SHULKER")) return 150;
+        if (n.contains("DIAMOND")) return 500;
+        if (n.contains("TRIDENT") || n.contains("HEART_OF_THE_SEA")) return 800;
+        if (n.contains("SPAWN_EGG") || n.contains("SPAWNER")) return 0;
+        if (n.contains("ANCIENT_DEBRIS")) return 300;
+        if (n.contains("KELP")) return 0.25;
+        if (n.contains("PICKLE") || n.contains("PETAL")) return 150;
+        if (n.contains("LOG") || n.contains("PLANKS")) return 4;
+        if (n.contains("SEEDS") || n.contains("WHEAT") || n.contains("CARROT") || n.contains("POTATO")) return 2;
+        if (n.contains("STONE") || n.contains("DIRT") || n.contains("COBBLE")) return 0.5;
+        if (n.contains("COOKED_") || n.contains("BREAD")) return 8;
+        if (n.contains("WOOL") || n.contains("GLASS")) return 3;
+        if (n.contains("BONE") || n.contains("STRING") || n.contains("ROTTEN_FLESH")) return 2;
+        return 5;
+    }
 
     @Override public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         String name = command.getName().toLowerCase(Locale.ROOT);
@@ -168,7 +196,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
                 }
                 p.sendMessage(PREFIX + "Usage: /sell [hand|all]"); return true;
             }
-            case "shop" -> { openShop(p); return true; }
+            case "shop", "buy" -> { openShop(p); return true; }
             case "balance" -> {
                 p.sendMessage(PREFIX + ChatColor.GREEN + "Lefta: " + ChatColor.GOLD + money(getBalance(p.getUniqueId(), "lefta"))
                         + ChatColor.GRAY + " | Shards: " + ChatColor.AQUA + money(getBalance(p.getUniqueId(), "shards")));
@@ -327,6 +355,13 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         final String type; Inventory inv; MenuHolder(String t){type=t;} @Override public Inventory getInventory(){return inv;}
     }
 
+    @EventHandler public void onJoin(org.bukkit.event.player.PlayerJoinEvent e) {
+        Player p=e.getPlayer();
+        e.setJoinMessage(ChatColor.DARK_AQUA+"✦ "+ChatColor.AQUA+p.getName()+ChatColor.GRAY+" joined Psiromouna SMP");
+        p.sendTitle(ChatColor.AQUA+""+ChatColor.BOLD+"WELCOME TO",ChatColor.WHITE+"PSIROMOUNA SMP",10,80,20);
+        updateDisplays(p);
+    }
+
     private void updateDisplays(Player p) {
         double lefta=getBalance(p.getUniqueId(),"lefta"), shards=getBalance(p.getUniqueId(),"shards");
         p.setPlayerListHeaderFooter(ChatColor.DARK_AQUA+"✦ PSIROMOUNA SMP ✦\n"+ChatColor.GRAY+"Survive • Trade • Build",
@@ -334,10 +369,13 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         Scoreboard board=Bukkit.getScoreboardManager().getNewScoreboard();
         Objective obj=board.registerNewObjective("smpinfo",Criteria.DUMMY,ChatColor.AQUA+""+ChatColor.BOLD+"PSIROMOUNA");
         obj.setDisplaySlot(DisplaySlot.SIDEBAR);
-        obj.getScore(ChatColor.GRAY+"Online: "+Bukkit.getOnlinePlayers().size()).setScore(4);
-        obj.getScore(ChatColor.GOLD+"Lefta: "+money(lefta)).setScore(3);
-        obj.getScore(ChatColor.AQUA+"Shards: "+money(shards)).setScore(2);
-        obj.getScore(ChatColor.DARK_GRAY+"play.psiromouna").setScore(1);
+        obj.getScore(ChatColor.DARK_GRAY+" ").setScore(7);
+        obj.getScore(ChatColor.GRAY+"Players").setScore(6);
+        obj.getScore(ChatColor.WHITE+""+Bukkit.getOnlinePlayers().size()+"/"+Bukkit.getMaxPlayers()).setScore(5);
+        obj.getScore(ChatColor.DARK_GRAY+"  ").setScore(4);
+        obj.getScore(ChatColor.GOLD+"€ "+money(lefta)).setScore(3);
+        obj.getScore(ChatColor.AQUA+"✦ "+money(shards)+" Shards").setScore(2);
+        obj.getScore(ChatColor.DARK_GRAY+"psiromouna SMP").setScore(1);
         p.setScoreboard(board);
     }
 
