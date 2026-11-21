@@ -70,7 +70,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         openDatabase();
         getServer().getPluginManager().registerEvents(this, this);
         if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) new EconomyExpansion(this).register();
-        for (String name : List.of("worth", "sell", "shop", "buy", "ah", "balance", "currency")) {
+        for (String name : List.of("worth", "sell", "shop", "buy", "ah", "balance", "currency", "cmds")) {
             PluginCommand cmd = getCommand(name);
             if (cmd != null) cmd.setTabCompleter(this);
         }
@@ -142,8 +142,8 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         if (n.contains("TRIDENT") || n.contains("HEART_OF_THE_SEA")) return 800;
         if (n.contains("SPAWN_EGG") || n.contains("SPAWNER")) return 0;
         if (n.contains("ANCIENT_DEBRIS")) return 300;
-        if (n.contains("KELP")) return 0.25;
-        if (n.contains("PICKLE") || n.contains("PETAL")) return 150;
+        if (n.contains("KELP")) return 125;
+        if (n.contains("PICKLE") || n.contains("PETAL")) return 175;
         if (n.contains("LOG") || n.contains("PLANKS")) return 4;
         if (n.contains("SEEDS") || n.contains("WHEAT") || n.contains("CARROT") || n.contains("POTATO")) return 2;
         if (n.contains("STONE") || n.contains("DIRT") || n.contains("COBBLE")) return 0.5;
@@ -159,6 +159,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         if (!(sender instanceof Player p)) { sender.sendMessage("Players only."); return true; }
 
         switch (name) {
+            case "cmds" -> { openCommands(p); return true; }
             case "worth" -> {
                 if (args.length == 0) { openWorth(p); return true; }
                 if (args[0].equalsIgnoreCase("search")) {
@@ -177,7 +178,8 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
                 return true;
             }
             case "sell" -> {
-                if (args.length == 0 || args[0].equalsIgnoreCase("hand")) {
+                if (args.length == 0) { openSell(p); return true; }
+                if (args[0].equalsIgnoreCase("hand")) {
                     ItemStack item = p.getInventory().getItemInMainHand();
                     if (item.getType().isAir()) { p.sendMessage(PREFIX + "Hold an item first."); return true; }
                     sellStack(p, item, item.getAmount()); return true;
@@ -202,7 +204,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
                         + ChatColor.GRAY + " | Shards: " + ChatColor.AQUA + money(getBalance(p.getUniqueId(), "shards")));
                 return true;
             }
-            case "ah" -> { return auctionCommand(p, args); }
+            case "ah" -> { if (args.length == 0) { openAuction(p); return true; } return auctionCommand(p, args); }
         }
         return false;
     }
@@ -262,11 +264,50 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         };
     }
     private void openShop(Player p) {
-        MenuHolder h = new MenuHolder("shop"); Inventory inv = Bukkit.createInventory(h,54,ChatColor.DARK_BLUE+"Lefta Shop"); h.inv=inv;
-        List<Material> items = DEFAULT_PRICES.keySet().stream().filter(m->m!=Material.SPAWNER).toList();
-        int slot=0; for(Material m:items) inv.setItem(slot++, button(m,ChatColor.YELLOW+nice(m),ChatColor.GRAY+"Price: "+ChatColor.GOLD+money(Math.max(1,worth(m)*2))+" Lefta",ChatColor.GREEN+"Click to buy 1"));
-        inv.setItem(49,button(Material.SPAWNER,ChatColor.AQUA+"Shard Spawner Shop",ChatColor.GRAY+"Buy spawners with Shards"));
+        MenuHolder h=new MenuHolder("shop-categories"); Inventory inv=Bukkit.createInventory(h,27,ChatColor.DARK_BLUE+"PSIROMOUNA STORE"); h.inv=inv;
+        Material[] icons={Material.IRON_SWORD,Material.BRICKS,Material.WHEAT,Material.SPAWNER,Material.COOKED_BEEF,Material.REDSTONE};
+        String[] cats={"PvP","Blocks","Farming","Spawners","Food","Redstone"};
+        for(int i=0;i<cats.length;i++) inv.setItem(10+i,button(icons[i],ChatColor.AQUA+cats[i],ChatColor.GRAY+"Browse "+cats[i]));
         p.openInventory(inv);
+    }
+
+    private void openCommands(Player p) {
+        MenuHolder h=new MenuHolder("commands"); Inventory inv=Bukkit.createInventory(h,27,ChatColor.DARK_AQUA+"Psiromouna Commands"); h.inv=inv;
+        inv.setItem(10,button(Material.EMERALD,ChatColor.GREEN+"/balance","View Euros and Shards"));
+        inv.setItem(11,button(Material.GOLD_INGOT,ChatColor.YELLOW+"/buy","Browse the shop"));
+        inv.setItem(12,button(Material.BOOK,ChatColor.AQUA+"/worth","Search item values"));
+        inv.setItem(13,button(Material.HOPPER,ChatColor.GREEN+"/sell","Open sell chest"));
+        inv.setItem(14,button(Material.CHEST,ChatColor.LIGHT_PURPLE+"/ah","Auction house"));
+        p.openInventory(inv);
+    }
+    private void openSell(Player p) {
+        MenuHolder h=new MenuHolder("sell"); Inventory inv=Bukkit.createInventory(h,54,ChatColor.DARK_GREEN+"Sell Chest"); h.inv=inv;
+        inv.setItem(49,button(Material.EMERALD_BLOCK,ChatColor.GREEN+"CONFIRM SELL","Sell all priced items above"));
+        p.openInventory(inv);
+    }
+    private void openAuction(Player p) {
+        MenuHolder h=new MenuHolder("auction"); Inventory inv=Bukkit.createInventory(h,54,ChatColor.DARK_PURPLE+"Auction House"); h.inv=inv;
+        try(Statement st=db.createStatement(); ResultSet rs=st.executeQuery("SELECT id,seller_name,price,item FROM auctions ORDER BY id DESC LIMIT 45")) {
+            int slot=0; while(rs.next()) { ItemStack it=decodeItem(rs.getString("item")); ItemMeta meta=it.getItemMeta(); if(meta!=null) { List<String> lore=new ArrayList<>(); lore.add("Listing #"+rs.getInt("id")); lore.add("Seller: "+rs.getString("seller_name")); lore.add("Price: €"+money(rs.getDouble("price"))); meta.setLore(lore); it.setItemMeta(meta); } inv.setItem(slot++,it); }
+        } catch(Exception ex) { p.sendMessage(PREFIX+"Could not load auctions."); }
+        p.openInventory(inv);
+    }
+    private void openShopCategory(Player p,String category) {
+        MenuHolder h=new MenuHolder("shop-items"); Inventory inv=Bukkit.createInventory(h,54,ChatColor.DARK_BLUE+"Shop: "+category); h.inv=inv;
+        List<Material> items=Arrays.stream(Material.values()).filter(m->m.isItem()&&!m.isAir()&&worth(m)>0&&shopMatches(m,category)).limit(45).toList();
+        int i=0; for(Material m:items) inv.setItem(i++,button(m,ChatColor.YELLOW+nice(m),ChatColor.GRAY+"Price: €"+money(Math.max(1,worth(m)*2))));
+        inv.setItem(49,button(Material.ARROW,ChatColor.RED+"Back","Categories")); p.openInventory(inv);
+    }
+    private boolean shopMatches(Material m,String c) {
+        String n=m.name();
+        return switch(c) {
+            case "PvP" -> n.contains("SWORD")||n.contains("AXE")||n.contains("BOW")||n.contains("CROSSBOW")||n.contains("ARROW")||n.contains("SHIELD")||n.contains("HELMET")||n.contains("CHESTPLATE")||n.contains("LEGGINGS")||n.contains("BOOTS");
+            case "Blocks" -> n.contains("STONE")||n.contains("DIRT")||n.contains("LOG")||n.contains("PLANK")||n.contains("WOOL")||n.contains("GLASS")||n.contains("BRICK")||n.contains("OBSIDIAN")||n.contains("SAND");
+            case "Farming" -> n.contains("SEEDS")||n.contains("WHEAT")||n.contains("CARROT")||n.contains("POTATO")||n.contains("SUGAR_CANE")||n.contains("PUMPKIN")||n.contains("MELON")||n.contains("KELP")||n.contains("PICKLE")||n.contains("PETAL");
+            case "Food" -> n.contains("BREAD")||n.contains("COOKED_")||n.contains("APPLE")||n.contains("BEEF")||n.contains("PORKCHOP")||n.contains("CHICKEN")||n.contains("FISH");
+            case "Redstone" -> n.contains("REDSTONE")||n.contains("PISTON")||n.contains("HOPPER")||n.contains("REPEATER")||n.contains("COMPARATOR")||n.contains("OBSERVER")||n.contains("DISPENSER")||n.contains("DROPPER")||n.contains("LEVER")||n.contains("BUTTON")||n.contains("RAIL");
+            default -> false;
+        };
     }
     private void openSpawnerShop(Player p) {
         MenuHolder h=new MenuHolder("spawners"); Inventory inv=Bukkit.createInventory(h,27,ChatColor.DARK_AQUA+"Shard Shop"); h.inv=inv;
@@ -280,6 +321,18 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         if(!(e.getWhoClicked() instanceof Player p) || !(e.getInventory().getHolder() instanceof MenuHolder h)) return;
         e.setCancelled(true); if(e.getRawSlot()<0||e.getRawSlot()>=e.getInventory().getSize()) return;
         ItemStack clicked=e.getCurrentItem(); if(clicked==null||clicked.getType().isAir()) return;
+
+        if(h.type.equals("commands")) { int slot=e.getRawSlot(); String[] cmds={"/balance","/buy","/worth","/sell","/ah"}; if(slot>=10&&slot<=14)p.performCommand(cmds[slot-10].substring(1)); return; }
+        if(h.type.equals("sell")) {
+            if(e.getRawSlot()==49) { double total=0; int count=0; for(int i=0;i<45;i++){ItemStack it=h.inv.getItem(i);if(it==null||it.getType().isAir())continue;double v=worth(it.getType());if(v>0){total+=v*it.getAmount();count+=it.getAmount();}}
+                if(count==0){p.sendMessage(PREFIX+"No sellable items.");return;}
+                for(int i=0;i<45;i++){ItemStack it=h.inv.getItem(i);if(it!=null&&!it.getType().isAir()&&worth(it.getType())>0)h.inv.setItem(i,null);}
+                changeBalance(p.getUniqueId(),"lefta",total);p.sendMessage(PREFIX+ChatColor.GREEN+"Sold "+count+" items for €"+money(total));p.closeInventory();
+            } else if(e.getRawSlot()>=45)e.setCancelled(true); return;
+        }
+        if(h.type.equals("shop-categories")) { String[] cats={"PvP","Blocks","Farming","Spawners","Food","Redstone"};int ix=e.getRawSlot()-10;if(ix>=0&&ix<6){if(ix==3)openSpawnerShop(p);else openShopCategory(p,cats[ix]);}return; }
+        if(h.type.equals("shop-items")) { if(e.getRawSlot()==49){openShop(p);return;} Material m=clicked.getType();double price=Math.max(1,worth(m)*2);if(getBalance(p.getUniqueId(),"lefta")<price){p.sendMessage(PREFIX+"Not enough Euros.");return;}if(!p.getInventory().addItem(new ItemStack(m)).isEmpty()){p.sendMessage(PREFIX+"Inventory full.");return;}changeBalance(p.getUniqueId(),"lefta",-price);p.sendMessage(PREFIX+"Bought "+nice(m)+" for €"+money(price));return; }
+        if(h.type.equals("auction")) { if(clicked.hasItemMeta()&&clicked.getItemMeta().hasLore()){String line=clicked.getItemMeta().getLore().get(0);if(line.startsWith("Listing #")){auctionCommand(p,new String[]{"buy",line.substring(9)});openAuction(p);}}return; }
         if(h.type.equals("worth")) {
             String[] cats={"Ores","Mob Drops","Farming","Food","Blocks","Nether","End","All Items"};
             int index=e.getRawSlot()-10; if(index>=0&&index<cats.length) openWorthCategory(p,cats[index]); return;
@@ -384,6 +437,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         if(args.length==1) {
             List<String> opts=switch(c) {
                 case "worth" -> List.of("search","hand");
+                case "cmds" -> List.of();
                 case "sell" -> List.of("hand","all");
                 case "ah" -> List.of("sell","buy","cancel","help");
                 case "currency" -> List.of("give");
