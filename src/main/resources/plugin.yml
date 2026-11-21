@@ -30,6 +30,9 @@ commands:
   banner:
     description: Register and manage your personal banner title.
     usage: /banner <title|rename <title>|move|remove>
+  afk:
+    description: Toggle AFK protection.
+    usage: /afk
 permissions:
   psiromouna.admin:
     description: Allows giving Lefta and Shards.
