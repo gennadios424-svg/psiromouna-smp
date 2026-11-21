@@ -13,6 +13,8 @@ import org.bukkit.event.*;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.inventory.*;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.inventory.meta.BlockStateMeta;
+import org.bukkit.block.CreatureSpawner;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scoreboard.*;
 import org.bukkit.util.io.BukkitObjectInputStream;
@@ -36,6 +38,168 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
     private static final long PVP_TAG_MILLIS = 15_000L;
     private static final String PREFIX = ChatColor.DARK_AQUA + "[SMP] " + ChatColor.RESET;
     private static final Map<Material, Double> DEFAULT_PRICES = new LinkedHashMap<>();
+    private static final List<String> COMMON_BLOCKS = List.of(
+        "OAK_LOG",
+        "SPRUCE_LOG",
+        "BIRCH_LOG",
+        "JUNGLE_LOG",
+        "ACACIA_LOG",
+        "DARK_OAK_LOG",
+        "MANGROVE_LOG",
+        "CHERRY_LOG",
+        "BAMBOO_BLOCK",
+        "CRIMSON_STEM",
+        "WARPED_STEM",
+        "OAK_PLANKS",
+        "SPRUCE_PLANKS",
+        "BIRCH_PLANKS",
+        "JUNGLE_PLANKS",
+        "ACACIA_PLANKS",
+        "DARK_OAK_PLANKS",
+        "MANGROVE_PLANKS",
+        "CHERRY_PLANKS",
+        "BAMBOO_PLANKS",
+        "CRIMSON_PLANKS",
+        "WARPED_PLANKS",
+        "OAK_STAIRS",
+        "SPRUCE_STAIRS",
+        "BIRCH_STAIRS",
+        "JUNGLE_STAIRS",
+        "ACACIA_STAIRS",
+        "DARK_OAK_STAIRS",
+        "MANGROVE_STAIRS",
+        "CHERRY_STAIRS",
+        "BAMBOO_STAIRS",
+        "CRIMSON_STAIRS",
+        "WARPED_STAIRS",
+        "OAK_SLAB",
+        "SPRUCE_SLAB",
+        "BIRCH_SLAB",
+        "JUNGLE_SLAB",
+        "ACACIA_SLAB",
+        "DARK_OAK_SLAB",
+        "MANGROVE_SLAB",
+        "CHERRY_SLAB",
+        "BAMBOO_SLAB",
+        "CRIMSON_SLAB",
+        "WARPED_SLAB",
+        "STONE",
+        "COBBLESTONE",
+        "MOSSY_COBBLESTONE",
+        "STONE_BRICKS",
+        "MOSSY_STONE_BRICKS",
+        "CRACKED_STONE_BRICKS",
+        "ANDESITE",
+        "POLISHED_ANDESITE",
+        "DIORITE",
+        "POLISHED_DIORITE",
+        "GRANITE",
+        "POLISHED_GRANITE",
+        "DEEPSLATE",
+        "COBBLED_DEEPSLATE",
+        "POLISHED_DEEPSLATE",
+        "DEEPSLATE_BRICKS",
+        "TUFF",
+        "TUFF_BRICKS",
+        "CALCITE",
+        "DRIPSTONE_BLOCK",
+        "DIRT",
+        "COARSE_DIRT",
+        "GRASS_BLOCK",
+        "MUD",
+        "PACKED_MUD",
+        "MUD_BRICKS",
+        "SAND",
+        "RED_SAND",
+        "GRAVEL",
+        "CLAY",
+        "BRICKS",
+        "SANDSTONE",
+        "RED_SANDSTONE",
+        "WHITE_WOOL",
+        "ORANGE_WOOL",
+        "MAGENTA_WOOL",
+        "LIGHT_BLUE_WOOL",
+        "YELLOW_WOOL",
+        "LIME_WOOL",
+        "PINK_WOOL",
+        "GRAY_WOOL",
+        "LIGHT_GRAY_WOOL",
+        "CYAN_WOOL",
+        "PURPLE_WOOL",
+        "BLUE_WOOL",
+        "BROWN_WOOL",
+        "GREEN_WOOL",
+        "RED_WOOL",
+        "BLACK_WOOL",
+        "WHITE_CONCRETE",
+        "ORANGE_CONCRETE",
+        "MAGENTA_CONCRETE",
+        "LIGHT_BLUE_CONCRETE",
+        "YELLOW_CONCRETE",
+        "LIME_CONCRETE",
+        "PINK_CONCRETE",
+        "GRAY_CONCRETE",
+        "LIGHT_GRAY_CONCRETE",
+        "CYAN_CONCRETE",
+        "PURPLE_CONCRETE",
+        "BLUE_CONCRETE",
+        "BROWN_CONCRETE",
+        "GREEN_CONCRETE",
+        "RED_CONCRETE",
+        "BLACK_CONCRETE",
+        "WHITE_TERRACOTTA",
+        "ORANGE_TERRACOTTA",
+        "MAGENTA_TERRACOTTA",
+        "LIGHT_BLUE_TERRACOTTA",
+        "YELLOW_TERRACOTTA",
+        "LIME_TERRACOTTA",
+        "PINK_TERRACOTTA",
+        "GRAY_TERRACOTTA",
+        "LIGHT_GRAY_TERRACOTTA",
+        "CYAN_TERRACOTTA",
+        "PURPLE_TERRACOTTA",
+        "BLUE_TERRACOTTA",
+        "BROWN_TERRACOTTA",
+        "GREEN_TERRACOTTA",
+        "RED_TERRACOTTA",
+        "BLACK_TERRACOTTA",
+        "GLASS",
+        "GLASS_PANE",
+        "TINTED_GLASS",
+        "OBSIDIAN",
+        "CRYING_OBSIDIAN",
+        "NETHERRACK",
+        "NETHER_BRICKS",
+        "BLACKSTONE",
+        "POLISHED_BLACKSTONE",
+        "QUARTZ_BLOCK",
+        "PRISMARINE",
+        "DARK_PRISMARINE",
+        "SEA_LANTERN",
+        "GLOWSTONE",
+        "END_STONE",
+        "END_STONE_BRICKS",
+        "BOOKSHELF",
+        "MOSS_BLOCK",
+        "HAY_BLOCK",
+        "BONE_BLOCK",
+        "ICE",
+        "PACKED_ICE",
+        "SNOW_BLOCK",
+        "PUMPKIN",
+        "MELON"
+    );
+    private static final List<org.bukkit.entity.EntityType> SPAWNER_TYPES = List.of(
+        org.bukkit.entity.EntityType.ZOMBIE, org.bukkit.entity.EntityType.SKELETON, org.bukkit.entity.EntityType.CREEPER,
+        org.bukkit.entity.EntityType.SPIDER, org.bukkit.entity.EntityType.CAVE_SPIDER, org.bukkit.entity.EntityType.ENDERMAN,
+        org.bukkit.entity.EntityType.BLAZE, org.bukkit.entity.EntityType.SLIME, org.bukkit.entity.EntityType.MAGMA_CUBE,
+        org.bukkit.entity.EntityType.WITCH, org.bukkit.entity.EntityType.PILLAGER, org.bukkit.entity.EntityType.DROWNED,
+        org.bukkit.entity.EntityType.HUSK, org.bukkit.entity.EntityType.STRAY, org.bukkit.entity.EntityType.PIG,
+        org.bukkit.entity.EntityType.COW, org.bukkit.entity.EntityType.SHEEP, org.bukkit.entity.EntityType.CHICKEN,
+        org.bukkit.entity.EntityType.RABBIT, org.bukkit.entity.EntityType.VILLAGER, org.bukkit.entity.EntityType.IRON_GOLEM,
+        org.bukkit.entity.EntityType.GUARDIAN, org.bukkit.entity.EntityType.PHANTOM, org.bukkit.entity.EntityType.SHULKER
+    );
 
     static {
         DEFAULT_PRICES.put(Material.DIAMOND, 500.0);
@@ -163,7 +327,32 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         if (n.contains("COOKED_") || n.contains("BREAD")) return 8;
         if (n.contains("WOOL") || n.contains("GLASS")) return 3;
         if (n.contains("BONE") || n.contains("STRING") || n.contains("ROTTEN_FLESH")) return 2;
-        return 5;
+        if (n.contains("NETHERITE") || n.contains("ANCIENT_DEBRIS")) return 900;
+        if (n.contains("TOTEM") || n.contains("ELYTRA") || n.contains("TRIDENT")) return 1800;
+        if (n.contains("SHULKER") || n.contains("END_CRYSTAL")) return 300;
+        if (n.contains("SPAWN_EGG") || n.contains("SPAWNER")) return 0;
+        if (n.contains("DIAMOND") || n.contains("EMERALD")) return 250;
+        if (n.contains("GOLD")) return 45;
+        if (n.contains("IRON")) return 20;
+        if (n.contains("COPPER")) return 9;
+        if (n.contains("QUARTZ") || n.contains("PRISMARINE") || n.contains("SEA_LANTERN")) return 24;
+        if (n.contains("OBSIDIAN") || n.contains("ANVIL")) return 35;
+        if (n.contains("CONCRETE") || n.contains("TERRACOTTA") || n.contains("GLASS")) return 8;
+        if (n.contains("WOOL") || n.contains("CARPET")) return 6;
+        if (n.endsWith("_LOG") || n.endsWith("_WOOD") || n.endsWith("_PLANKS")) return 4;
+        if (n.endsWith("_STAIRS") || n.endsWith("_SLAB") || n.endsWith("_WALL")) return 5;
+        if (n.contains("STONE") || n.contains("DIRT") || n.contains("SAND") || n.contains("GRAVEL")) return 2;
+        if (n.contains("COOKED_") || n.contains("GOLDEN_")) return 14;
+        if (n.contains("ENCHANTED") || n.contains("NETHER_STAR")) return 1200;
+        return 3;
+    }
+
+    private double shopPrice(Material material) {
+        double base = Math.max(1.0, worth(material) * 2.0);
+        return Math.round((base + (material.ordinal() + 1) / 10000.0) * 10000.0) / 10000.0;
+    }
+    private String shopMoney(double amount) {
+        return String.format(Locale.US, "%,.4f", amount).replaceAll("0+$", "").replaceAll("\\.$", "");
     }
 
     @Override public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
@@ -575,8 +764,11 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         int start = current * 45;
         for (int i = start; i < Math.min(start + 45, items.size()); i++) {
             Material m = items.get(i);
-            double price = Math.max(400, Math.ceil(worth(m) * 2));
-            inv.setItem(i - start, button(m, ChatColor.YELLOW + nice(m), ChatColor.GRAY + "Price: €" + money(price)));
+            double price = shopPrice(m);
+            inv.setItem(i - start, button(m, ChatColor.YELLOW + nice(m),
+                    ChatColor.GRAY + "Worth: €" + money(worth(m)),
+                    ChatColor.GOLD + "Price: €" + shopMoney(price),
+                    ChatColor.GREEN + "Click to choose quantity"));
         }
         inv.setItem(45, button(Material.ARROW, ChatColor.RED + "Back", "Categories"));
         if (current > 0) inv.setItem(48, button(Material.SPECTRAL_ARROW, ChatColor.YELLOW + "Previous page"));
@@ -588,7 +780,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         if (m == null || !m.isItem() || m.isAir()) return false;
         String n = m.name();
         return switch (c) {
-            case "Blocks" -> isBuildingBlock(m, n);
+            case "Blocks" -> COMMON_BLOCKS.contains(n);
             case "PvP" -> Set.of("IRON_HELMET", "IRON_CHESTPLATE", "IRON_LEGGINGS", "IRON_BOOTS").contains(n);
             case "Farming" -> Set.of("WHEAT_SEEDS", "BEETROOT_SEEDS", "MELON_SEEDS", "PUMPKIN_SEEDS",
                     "WHEAT", "CARROT", "POTATO", "BEETROOT", "SUGAR_CANE", "PUMPKIN",
@@ -602,35 +794,106 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         };
     }
     private boolean isBuildingBlock(Material m, String n) {
-        if (!m.isBlock() || n.contains("ORE") || n.equals("SPAWNER")) return false;
-        if (Set.of("ENCHANTING_TABLE", "CRAFTING_TABLE", "FURNACE", "BLAST_FURNACE", "SMOKER",
-                "ANVIL", "CHIPPED_ANVIL", "DAMAGED_ANVIL", "ENDER_CHEST", "CHEST", "TRAPPED_CHEST",
-                "BARREL", "HOPPER", "DISPENSER", "DROPPER", "BREWING_STAND", "BEACON", "CONDUIT",
-                "LECTERN", "LOOM", "CARTOGRAPHY_TABLE", "FLETCHING_TABLE", "SMITHING_TABLE",
-                "STONECUTTER", "GRINDSTONE", "COMPOSTER", "BEEHIVE", "BEE_NEST", "JUKEBOX",
-                "NOTE_BLOCK", "OBSERVER", "PISTON", "STICKY_PISTON", "REDSTONE_LAMP",
-                "DAYLIGHT_DETECTOR").contains(n)) return false;
-        return n.endsWith("_LOG") || n.endsWith("_WOOD") || n.endsWith("_PLANKS")
-                || n.endsWith("_STAIRS") || n.endsWith("_SLAB") || n.endsWith("_WALL")
-                || n.endsWith("_FENCE") || n.endsWith("_FENCE_GATE") || n.endsWith("_DOOR")
-                || n.endsWith("_TRAPDOOR") || n.endsWith("_WOOL") || n.endsWith("_CARPET")
-                || n.endsWith("_GLASS") || n.endsWith("_GLASS_PANE") || n.endsWith("_TERRACOTTA")
-                || n.endsWith("_CONCRETE") || n.endsWith("_CONCRETE_POWDER") || n.endsWith("_BRICKS")
-                || n.endsWith("_LEAVES") || n.endsWith("_MUSHROOM_BLOCK") || n.endsWith("_CORAL_BLOCK")
-                || n.endsWith("_BASALT") || n.endsWith("_STONE") || n.endsWith("_DEEPSLATE")
-                || n.endsWith("_SANDSTONE") || n.endsWith("_QUARTZ_BLOCK") || n.endsWith("_PRISMARINE")
-                || Set.of("STONE", "COBBLESTONE", "MOSSY_COBBLESTONE", "DIRT", "GRASS_BLOCK", "SAND",
-                "RED_SAND", "GRAVEL", "CLAY", "BRICKS", "BOOKSHELF", "MOSS_BLOCK", "MUD",
-                "PACKED_MUD", "MUD_BRICKS", "OBSIDIAN", "CRYING_OBSIDIAN", "END_STONE",
-                "END_STONE_BRICKS", "NETHER_BRICKS", "RED_NETHER_BRICKS", "BLACKSTONE",
-                "POLISHED_BLACKSTONE", "GILDED_BLACKSTONE", "QUARTZ_BLOCK", "PRISMARINE",
-                "DARK_PRISMARINE", "SEA_LANTERN", "GLOWSTONE", "ICE", "PACKED_ICE", "BLUE_ICE",
-                "SNOW_BLOCK", "HAY_BLOCK", "BONE_BLOCK", "MELON", "PUMPKIN", "JACK_O_LANTERN").contains(n);
+        return m != null && m.isBlock() && COMMON_BLOCKS.contains(n);
     }
-    private void openSpawnerShop(Player p) {
-        MenuHolder h=new MenuHolder("spawners"); Inventory inv=Bukkit.createInventory(h,27,ChatColor.DARK_AQUA+"Shard Shop"); h.inv=inv;
-        inv.setItem(13,button(Material.SPAWNER,ChatColor.AQUA+"Mob Spawner",ChatColor.GRAY+"Cost: 25 Shards",ChatColor.GREEN+"Click to purchase"));
+
+    private void openSpawnerShop(Player p) { openSpawnerShop(p, 0); }
+    private void openSpawnerShop(Player p, int page) {
+        int pages = (SPAWNER_TYPES.size() + 44) / 45;
+        int current = Math.max(0, Math.min(page, pages - 1));
+        MenuHolder h = new MenuHolder("spawner-types", "", current);
+        Inventory inv = Bukkit.createInventory(h, 54, ChatColor.DARK_AQUA + "Mob Spawners (" + (current + 1) + "/" + pages + ")");
+        h.inv = inv;
+        int start = current * 45;
+        for (int i = start; i < Math.min(start + 45, SPAWNER_TYPES.size()); i++) {
+            org.bukkit.entity.EntityType type = SPAWNER_TYPES.get(i);
+            Material icon = Material.matchMaterial(type.name() + "_SPAWN_EGG");
+            if (icon == null) icon = Material.SPAWNER;
+            inv.setItem(i - start, button(icon, ChatColor.AQUA + niceEntity(type),
+                    ChatColor.GRAY + "Cost: " + ChatColor.AQUA + spawnerPrice(type) + " Shards",
+                    ChatColor.GREEN + "Click to choose quantity"));
+        }
+        inv.setItem(45, button(Material.ARROW, ChatColor.RED + "Back", "Shop categories"));
+        if (current > 0) inv.setItem(48, button(Material.SPECTRAL_ARROW, ChatColor.YELLOW + "Previous page"));
+        inv.setItem(49, button(Material.PAPER, ChatColor.GOLD + "Page " + (current + 1) + "/" + pages));
+        if (current + 1 < pages) inv.setItem(50, button(Material.SPECTRAL_ARROW, ChatColor.GREEN + "Next page"));
         p.openInventory(inv);
+    }
+    private String niceEntity(org.bukkit.entity.EntityType type) {
+        return Arrays.stream(type.name().toLowerCase(Locale.ROOT).split("_"))
+                .map(v -> Character.toUpperCase(v.charAt(0)) + v.substring(1)).collect(Collectors.joining(" "));
+    }
+    private int spawnerPrice(org.bukkit.entity.EntityType type) {
+        return switch (type) {
+            case PIG, COW, SHEEP, CHICKEN, RABBIT -> 20;
+            case ZOMBIE, SKELETON, SPIDER, DROWNED, HUSK, STRAY -> 30;
+            case CREEPER, CAVE_SPIDER, SLIME, WITCH, PILLAGER -> 45;
+            case ENDERMAN, BLAZE, MAGMA_CUBE, PHANTOM, GUARDIAN -> 65;
+            case VILLAGER, IRON_GOLEM -> 90;
+            case SHULKER -> 120;
+            default -> 50;
+        };
+    }
+    private void openQuantityMenu(Player p, Material material, org.bukkit.entity.EntityType spawnerType,
+                                  double unitPrice, String currency) {
+        MenuHolder h = new MenuHolder("buy-quantity", "", 0, material, spawnerType, unitPrice, currency);
+        Inventory inv = Bukkit.createInventory(h, 27, ChatColor.DARK_GREEN + "Choose quantity");
+        h.inv = inv;
+        int[] amounts = {1, 16, 32, 64};
+        for (int i = 0; i < amounts.length; i++) {
+            int amount = amounts[i];
+            ItemStack icon = new ItemStack(material, amount);
+            if (spawnerType != null) applySpawnerType(icon, spawnerType);
+            inv.setItem(10 + i, buttonWithAmount(icon, ChatColor.GREEN + "Buy x" + amount,
+                    ChatColor.GRAY + "Unit price: " + currencyLabel(currency) + shopMoney(unitPrice),
+                    ChatColor.YELLOW + "Total: " + currencyLabel(currency) + shopMoney(unitPrice * amount),
+                    ChatColor.GREEN + "Click to confirm"));
+        }
+        inv.setItem(18, button(Material.ARROW, ChatColor.RED + "Back"));
+        p.openInventory(inv);
+    }
+    private String currencyLabel(String currency) { return currency.equals("shards") ? "" : "€"; }
+    private ItemStack buttonWithAmount(ItemStack item, String name, String... lore) {
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) { meta.setDisplayName(name); meta.setLore(Arrays.asList(lore)); item.setItemMeta(meta); }
+        return item;
+    }
+    private boolean applySpawnerType(ItemStack item, org.bukkit.entity.EntityType type) {
+        if (!(item.getItemMeta() instanceof BlockStateMeta meta)) return false;
+        if (!(meta.getBlockState() instanceof CreatureSpawner state)) return false;
+        state.setSpawnedType(type);
+        meta.setBlockState(state);
+        item.setItemMeta(meta);
+        return true;
+    }
+    private boolean canFit(Player player, ItemStack item) {
+        int remaining = item.getAmount();
+        for (ItemStack slot : player.getInventory().getStorageContents()) {
+            if (slot == null || slot.getType().isAir()) remaining -= item.getMaxStackSize();
+            else if (slot.isSimilar(item)) remaining -= Math.max(0, slot.getMaxStackSize() - slot.getAmount());
+            if (remaining <= 0) return true;
+        }
+        return false;
+    }
+    private void finishShopPurchase(Player p, MenuHolder h, int amount) {
+        double total = h.unitPrice * amount;
+        if (getBalance(p.getUniqueId(), h.currency) + 0.000001 < total) {
+            p.sendMessage(PREFIX + ChatColor.RED + "Not enough " + (h.currency.equals("shards") ? "Shards" : "Lefta")
+                    + ". Total required: " + shopMoney(total) + ".");
+            return;
+        }
+        ItemStack bought = new ItemStack(h.itemMaterial, amount);
+        if (h.spawnerType != null && !applySpawnerType(bought, h.spawnerType)) {
+            p.sendMessage(PREFIX + ChatColor.RED + "Could not create that mob spawner.");
+            return;
+        }
+        if (!canFit(p, bought)) { p.sendMessage(PREFIX + ChatColor.RED + "Not enough inventory space for that quantity."); return; }
+        p.getInventory().addItem(bought);
+        changeBalance(p.getUniqueId(), h.currency, -total);
+        p.sendMessage(PREFIX + ChatColor.GREEN + "Bought x" + amount + " " +
+                (h.spawnerType == null ? nice(h.itemMaterial) : niceEntity(h.spawnerType) + " Spawner") +
+                " for " + (h.currency.equals("shards") ? shopMoney(total) + " Shards" : "€" + shopMoney(total)) + ".");
+        p.closeInventory();
     }
     private ItemStack button(Material m,String name,String... lore) {
         ItemStack it=new ItemStack(m); ItemMeta meta=it.getItemMeta(); if(meta!=null){meta.setDisplayName(name);meta.setLore(Arrays.asList(lore));it.setItemMeta(meta);} return it;
@@ -731,11 +994,8 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
             if (slot == 50) { openShopCategory(p, h.category, h.page + 1); return; }
             if (slot < 0 || slot >= 45) return;
             Material m = clicked.getType();
-            double price = Math.max(400, Math.ceil(worth(m) * 2));
-            if (getBalance(p.getUniqueId(), "lefta") < price) { p.sendMessage(PREFIX + "Not enough Lefta. This item costs " + money(price) + "."); return; }
-            if (!p.getInventory().addItem(new ItemStack(m, 1)).isEmpty()) { p.sendMessage(PREFIX + "Inventory full."); return; }
-            changeBalance(p.getUniqueId(), "lefta", -price);
-            p.sendMessage(PREFIX + "Bought " + nice(m) + " for €" + money(price) + ".");
+            double price = shopPrice(m);
+            openQuantityMenu(p, m, null, price, "lefta");
             return;
         }
         if(h.type.equals("auction")) { if(clicked.hasItemMeta()&&clicked.getItemMeta().hasLore()){String line=clicked.getItemMeta().getLore().get(0);if(line.startsWith("Listing #")){auctionCommand(p,new String[]{"buy",line.substring(9)});openAuction(p);}}return; }
@@ -757,10 +1017,28 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
             if(!p.getInventory().addItem(new ItemStack(m,1)).isEmpty()){p.sendMessage(PREFIX+"Your inventory is full.");return;}
             changeBalance(p.getUniqueId(),"lefta",-price); p.sendMessage(PREFIX+ChatColor.GREEN+"Bought "+nice(m)+" for €"+money(price)+"."); return;
         }
-        if(h.type.equals("spawners")&&e.getRawSlot()==13){
-            if(getBalance(p.getUniqueId(),"shards")<25){p.sendMessage(PREFIX+ChatColor.RED+"Not enough Shards.");return;}
-            if(!p.getInventory().addItem(new ItemStack(Material.SPAWNER)).isEmpty()){p.sendMessage(PREFIX+"Your inventory is full.");return;}
-            changeBalance(p.getUniqueId(),"shards",-25);p.sendMessage(PREFIX+ChatColor.AQUA+"Bought a Mob Spawner for 25 Shards.");
+        if (h.type.equals("spawner-types")) {
+            int slot = e.getRawSlot();
+            if (slot == 45) { openShop(p); return; }
+            if (slot == 48 && h.page > 0) { openSpawnerShop(p, h.page - 1); return; }
+            if (slot == 50) { openSpawnerShop(p, h.page + 1); return; }
+            if (slot < 0 || slot >= 45) return;
+            int index = h.page * 45 + slot;
+            if (index >= SPAWNER_TYPES.size()) return;
+            org.bukkit.entity.EntityType type = SPAWNER_TYPES.get(index);
+            openQuantityMenu(p, Material.SPAWNER, type, spawnerPrice(type), "shards");
+            return;
+        }
+        if (h.type.equals("buy-quantity")) {
+            int slot = e.getRawSlot();
+            if (slot == 18) {
+                if (h.spawnerType != null) openSpawnerShop(p);
+                else openShop(p);
+                return;
+            }
+            int[] amounts = {1, 16, 32, 64};
+            if (slot >= 10 && slot <= 13) finishShopPurchase(p, h, amounts[slot - 10]);
+            return;
         }
     }
 
@@ -821,12 +1099,24 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         final String type;
         final String category;
         final int page;
+        final Material itemMaterial;
+        final org.bukkit.entity.EntityType spawnerType;
+        final double unitPrice;
+        final String currency;
         Inventory inv;
         MenuHolder(String type) { this(type, "", 0); }
         MenuHolder(String type, String category, int page) {
+            this(type, category, page, null, null, 0, "lefta");
+        }
+        MenuHolder(String type, String category, int page, Material itemMaterial,
+                   org.bukkit.entity.EntityType spawnerType, double unitPrice, String currency) {
             this.type = type;
             this.category = category;
             this.page = page;
+            this.itemMaterial = itemMaterial;
+            this.spawnerType = spawnerType;
+            this.unitPrice = unitPrice;
+            this.currency = currency;
         }
         @Override public Inventory getInventory() { return inv; }
     }
@@ -997,7 +1287,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
     public void onPvpTaggedInventory(InventoryClickEvent e) {
         if (!(e.getWhoClicked() instanceof Player p) || !isPvpTagged(p)) return;
         if (!(e.getView().getTopInventory().getHolder() instanceof MenuHolder holder) ||
-                !(holder.type.equals("shop-categories") || holder.type.equals("shop-items") || holder.type.equals("spawners"))) e.setCancelled(true);
+                !(holder.type.equals("shop-categories") || holder.type.equals("shop-items") || holder.type.equals("spawner-types") || holder.type.equals("buy-quantity"))) e.setCancelled(true);
     }
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onPvpTaggedInventoryDrag(org.bukkit.event.inventory.InventoryDragEvent e) {
