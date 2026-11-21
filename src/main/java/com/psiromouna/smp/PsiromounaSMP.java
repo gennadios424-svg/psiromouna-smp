@@ -362,6 +362,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
                     entity.setViewRange(128.0f);
                     entity.setLineWidth(240);
                     entity.setShadowed(true);
+                    entity.setTransformation(new org.bukkit.util.Transformation(new org.joml.Vector3f(0, 0, 0), new org.joml.AxisAngle4f(), new org.joml.Vector3f(2.5f, 2.5f, 2.5f), new org.joml.AxisAngle4f()));
                     entity.setSeeThrough(false);
                     entity.setDefaultBackground(false);
                     entity.setPersistent(true);
@@ -864,6 +865,26 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onAfkInventory(InventoryClickEvent e) {
         if (e.getWhoClicked() instanceof Player p && afkPlayers.contains(p.getUniqueId())) e.setCancelled(true);
+    }
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onPvpTaggedInteract(org.bukkit.event.player.PlayerInteractEvent e) {
+        if (isPvpTagged(e.getPlayer())) e.setCancelled(true);
+    }
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onPvpTaggedBreak(org.bukkit.event.block.BlockBreakEvent e) {
+        if (isPvpTagged(e.getPlayer())) e.setCancelled(true);
+    }
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onPvpTaggedPlace(org.bukkit.event.block.BlockPlaceEvent e) {
+        if (isPvpTagged(e.getPlayer())) e.setCancelled(true);
+    }
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onPvpTaggedDrop(org.bukkit.event.player.PlayerDropItemEvent e) {
+        if (isPvpTagged(e.getPlayer())) e.setCancelled(true);
+    }
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onPvpTaggedSwap(org.bukkit.event.player.PlayerSwapHandItemsEvent e) {
+        if (isPvpTagged(e.getPlayer())) e.setCancelled(true);
     }
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onPvpTaggedInventory(InventoryClickEvent e) {
