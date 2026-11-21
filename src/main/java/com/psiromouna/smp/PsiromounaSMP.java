@@ -306,7 +306,24 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
     private void openAuction(Player p) {
         MenuHolder h=new MenuHolder("auction"); Inventory inv=Bukkit.createInventory(h,54,ChatColor.DARK_PURPLE+"Auction House"); h.inv=inv;
         try(Statement st=db.createStatement(); ResultSet rs=st.executeQuery("SELECT id,seller_name,price,item FROM auctions ORDER BY id DESC LIMIT 45")) {
-            int slot=0; while(rs.next()) { ItemStack it=decodeItem(rs.getString("item")); ItemMeta meta=it.getItemMeta(); if(meta!=null) { List<String> lore=new ArrayList<>(); lore.add("Listing #"+rs.getInt("id")); lore.add("Seller: "+rs.getString("seller_name")); lore.add("Price: €"+money(rs.getDouble("price"))); meta.setLore(lore); it.setItemMeta(meta); } inv.setItem(slot++,it); }
+            int slot=0;
+            while(rs.next()) {
+                ItemStack it=decodeItem(rs.getString("item"));
+                ItemMeta meta=it.getItemMeta();
+                if(meta!=null) {
+                    List<String> lore=new ArrayList<>();
+                    lore.add(ChatColor.GOLD+""+ChatColor.BOLD+"PRICE");
+                    lore.add(ChatColor.YELLOW+"€ "+ChatColor.WHITE+ChatColor.BOLD+money(rs.getDouble("price"))+" Lefta");
+                    lore.add(ChatColor.DARK_GRAY+"----------------");
+                    lore.add(ChatColor.GRAY+"Seller: "+ChatColor.LIGHT_PURPLE+rs.getString("seller_name"));
+                    lore.add(ChatColor.GRAY+"Amount: "+ChatColor.WHITE+"x"+it.getAmount());
+                    lore.add(ChatColor.DARK_GRAY+"Listing #"+rs.getInt("id"));
+                    lore.add(ChatColor.GREEN+"Click to purchase");
+                    meta.setLore(lore);
+                    it.setItemMeta(meta);
+                }
+                inv.setItem(slot++,it);
+            }
         } catch(Exception ex) { p.sendMessage(PREFIX+"Could not load auctions."); }
         p.openInventory(inv);
     }
@@ -583,15 +600,24 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         p.setPlayerListHeaderFooter(ChatColor.DARK_AQUA+"✦ PSIROMOUNA SMP ✦\n"+ChatColor.GRAY+"Survive • Trade • Build",
                 ChatColor.GOLD+"€ "+money(lefta)+"   "+ChatColor.AQUA+"Shards: "+money(shards)+"\n"+ChatColor.GRAY+"Players: "+Bukkit.getOnlinePlayers().size()+"/"+Bukkit.getMaxPlayers());
         Scoreboard board=Bukkit.getScoreboardManager().getNewScoreboard();
-        Objective obj=board.registerNewObjective("smpinfo",Criteria.DUMMY,ChatColor.AQUA+""+ChatColor.BOLD+"PSIROMOUNA");
+        ChatColor pink = ChatColor.LIGHT_PURPLE;
+        Objective obj=board.registerNewObjective("smpinfo",Criteria.DUMMY,pink+""+ChatColor.BOLD+"✦ PSIROMOUNA ✦");
         obj.setDisplaySlot(DisplaySlot.SIDEBAR);
-        obj.getScore(ChatColor.DARK_GRAY+" ").setScore(7);
-        obj.getScore(ChatColor.GRAY+"Players").setScore(6);
-        obj.getScore(ChatColor.WHITE+""+Bukkit.getOnlinePlayers().size()+"/"+Bukkit.getMaxPlayers()).setScore(5);
-        obj.getScore(ChatColor.DARK_GRAY+"  ").setScore(4);
-        obj.getScore(ChatColor.GOLD+"€ "+money(lefta)).setScore(3);
-        obj.getScore(ChatColor.AQUA+"✦ "+money(shards)+" Shards").setScore(2);
-        obj.getScore(ChatColor.DARK_GRAY+"psiromouna SMP").setScore(1);
+        String[] lines = {
+                pink + "" + ChatColor.BOLD + "ONLINE",
+                ChatColor.WHITE + "" + Bukkit.getOnlinePlayers().size() + "/" + Bukkit.getMaxPlayers(),
+                ChatColor.DARK_GRAY + " ",
+                pink + "" + ChatColor.BOLD + "YOUR BALANCE",
+                ChatColor.WHITE + "€ " + ChatColor.GOLD + money(lefta),
+                ChatColor.WHITE + "✦ " + pink + money(shards) + " Shards",
+                ChatColor.DARK_PURPLE + "psiromouna SMP"
+        };
+        int score = lines.length;
+        for (String line : lines) {
+            org.bukkit.scoreboard.Score entry = obj.getScore(line);
+            entry.setScore(score--);
+            entry.setNumberFormat(org.bukkit.scoreboard.NumberFormat.blank());
+        }
         p.setScoreboard(board);
     }
 
