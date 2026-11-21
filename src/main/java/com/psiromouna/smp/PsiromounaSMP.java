@@ -324,7 +324,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         } catch (SQLException ex) { return false; }
     }
     private void refreshPlayerBanner(UUID owner) {
-        try (PreparedStatement ps = db.prepareStatement("SELECT world,title,display_uuid FROM player_banners WHERE owner=?")) {
+        try (PreparedStatement ps = db.prepareStatement("SELECT world,x,y,z,title,display_uuid FROM player_banners WHERE owner=?")) {
             ps.setString(1, owner.toString());
             try (ResultSet rs = ps.executeQuery()) {
                 if (!rs.next()) return;
