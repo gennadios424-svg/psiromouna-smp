@@ -70,6 +70,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
     @Override public void onEnable() {
         saveDefaultConfig();
         openDatabase();
+        loadLoadedBannerTitles();
         getServer().getPluginManager().registerEvents(this, this);
         if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) new EconomyExpansion(this).register();
         for (String name : List.of("worth", "sell", "shop", "buy", "ah", "balance", "currency", "cmds", "banner")) {
@@ -214,6 +215,14 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
             case "ah" -> { if (args.length == 0) { openAuction(p); return true; } return auctionCommand(p, args); }
         }
         return false;
+    }
+
+    private void loadLoadedBannerTitles() {
+        try (Statement st = db.createStatement(); ResultSet rs = st.executeQuery("SELECT owner FROM player_banners")) {
+            List<UUID> owners = new ArrayList<>();
+            while (rs.next()) owners.add(UUID.fromString(rs.getString(1)));
+            for (UUID owner : owners) spawnPlayerBanner(owner);
+        } catch (SQLException ex) { getLogger().warning("Could not restore banner titles: " + ex.getMessage()); }
     }
 
     private boolean bannerCommand(Player p, String[] args) {
