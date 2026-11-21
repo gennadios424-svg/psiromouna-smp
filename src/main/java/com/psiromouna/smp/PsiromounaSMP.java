@@ -351,20 +351,94 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
     private ItemStack button(Material m,String name,String... lore) {
         ItemStack it=new ItemStack(m); ItemMeta meta=it.getItemMeta(); if(meta!=null){meta.setDisplayName(name);meta.setLore(Arrays.asList(lore));it.setItemMeta(meta);} return it;
     }
+    private ItemStack addToSellChest(Inventory inventory, ItemStack source) {
+        ItemStack remaining = source.clone();
+        // First merge into matching stacks.
+        for (int slot = 0; slot < 45 && remaining.getAmount() > 0; slot++) {
+            ItemStack existing = inventory.getItem(slot);
+            if (existing == null || existing.getType().isAir() || !existing.isSimilar(remaining)) continue;
+            int room = existing.getMaxStackSize() - existing.getAmount();
+            if (room <= 0) continue;
+            int moved = Math.min(room, remaining.getAmount());
+            existing.setAmount(existing.getAmount() + moved);
+            remaining.setAmount(remaining.getAmount() - moved);
+        }
+        // Then use empty storage slots only; never touch the control row.
+        for (int slot = 0; slot < 45 && remaining.getAmount() > 0; slot++) {
+            ItemStack existing = inventory.getItem(slot);
+            if (existing != null && !existing.getType().isAir()) continue;
+            int moved = Math.min(remaining.getMaxStackSize(), remaining.getAmount());
+            ItemStack placed = remaining.clone();
+            placed.setAmount(moved);
+            inventory.setItem(slot, placed);
+            remaining.setAmount(remaining.getAmount() - moved);
+        }
+        return remaining.getAmount() <= 0 ? null : remaining;
+    }
+
+    @EventHandler public void onSellDrag(org.bukkit.event.inventory.InventoryDragEvent e) {
+        if (!(e.getInventory().getHolder() instanceof MenuHolder h) || !h.type.equals("sell")) return;
+        // Only allow drags that touch storage slots; the bottom control row stays locked.
+        for (int raw : e.getRawSlots()) {
+            if (raw >= 45 && raw < e.getInventory().getSize()) {
+                e.setCancelled(true);
+                return;
+            }
+        }
+    }
+
     @EventHandler public void onMenuClick(InventoryClickEvent e) {
         if(!(e.getWhoClicked() instanceof Player p) || !(e.getInventory().getHolder() instanceof MenuHolder h)) return;
-        e.setCancelled(true); if(e.getRawSlot()<0||e.getRawSlot()>=e.getInventory().getSize()) return;
+        if (h.type.equals("sell")) {
+            int raw = e.getRawSlot();
+            if (raw >= e.getInventory().getSize()) {
+                // Allow normal clicks in the player's inventory so items can be picked up.
+                if (e.isShiftClick()) {
+                    e.setCancelled(true);
+                    ItemStack moving = e.getCurrentItem();
+                    if (moving != null && !moving.getType().isAir()) {
+                        ItemStack remainder = addToSellChest(h.inv, moving);
+                        if (remainder == null || remainder.getType().isAir()) {
+                            e.setCurrentItem(null);
+                        } else {
+                            e.setCurrentItem(remainder);
+                        }
+                    }
+                } else {
+                    e.setCancelled(false);
+                }
+                return;
+            }
+            if (raw >= 0 && raw < 45) {
+                e.setCancelled(false);
+                return;
+            }
+            e.setCancelled(true);
+            if (raw == 49) {
+                double total = 0; int count = 0;
+                for (int i = 0; i < 45; i++) {
+                    ItemStack it = h.inv.getItem(i);
+                    if (it == null || it.getType().isAir()) continue;
+                    double v = worth(it.getType());
+                    if (v > 0) { total += v * it.getAmount(); count += it.getAmount(); }
+                }
+                if (count == 0) { p.sendMessage(PREFIX + "No sellable items."); return; }
+                for (int i = 0; i < 45; i++) {
+                    ItemStack it = h.inv.getItem(i);
+                    if (it != null && !it.getType().isAir() && worth(it.getType()) > 0) h.inv.setItem(i, null);
+                }
+                changeBalance(p.getUniqueId(), "lefta", total);
+                p.sendMessage(PREFIX + ChatColor.GREEN + "Sold " + count + " items for " + money(total) + " Lefta.");
+                p.closeInventory();
+            }
+            return;
+        }
+
+        e.setCancelled(true);
+        if(e.getRawSlot()<0||e.getRawSlot()>=e.getInventory().getSize()) return;
         ItemStack clicked=e.getCurrentItem(); if(clicked==null||clicked.getType().isAir()) return;
 
         if(h.type.equals("commands")) { int slot=e.getRawSlot(); String[] cmds={"/balance","/buy","/worth","/sell","/ah"}; if(slot>=10&&slot<=14)p.performCommand(cmds[slot-10].substring(1)); return; }
-        if(h.type.equals("sell")) {
-            if(e.getRawSlot()>=0&&e.getRawSlot()<45){e.setCancelled(false);return;}
-            if(e.getRawSlot()==49) { double total=0; int count=0; for(int i=0;i<45;i++){ItemStack it=h.inv.getItem(i);if(it==null||it.getType().isAir())continue;double v=worth(it.getType());if(v>0){total+=v*it.getAmount();count+=it.getAmount();}}
-                if(count==0){p.sendMessage(PREFIX+"No sellable items.");return;}
-                for(int i=0;i<45;i++){ItemStack it=h.inv.getItem(i);if(it!=null&&!it.getType().isAir()&&worth(it.getType())>0)h.inv.setItem(i,null);}
-                changeBalance(p.getUniqueId(),"lefta",total);p.sendMessage(PREFIX+ChatColor.GREEN+"Sold "+count+" items for €"+money(total));p.closeInventory();
-            } else if(e.getRawSlot()>=45)e.setCancelled(true); return;
-        }
         if(h.type.equals("shop-categories")) { String[] cats={"PvP","Blocks","Farming","Spawners","Food","Redstone"};int ix=e.getRawSlot()-10;if(ix>=0&&ix<6){if(ix==3)openSpawnerShop(p);else openShopCategory(p,cats[ix]);}return; }
         if(h.type.equals("shop-items")) {
             int slot = e.getRawSlot();
