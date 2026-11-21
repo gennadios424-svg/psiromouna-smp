@@ -340,7 +340,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
     }
     private void updateBannerTitleVisibility() {
         try (Statement st = db.createStatement();
-             ResultSet rs = st.executeQuery("SELECT world,x,y,z,display_uuid FROM player_banners WHERE display_uuid IS NOT NULL")) {
+             ResultSet rs = st.executeQuery("SELECT world,x,y,z,title,display_uuid FROM player_banners WHERE display_uuid IS NOT NULL")) {
             while (rs.next()) {
                 org.bukkit.World world = Bukkit.getWorld(rs.getString("world"));
                 if (world == null) continue;
@@ -348,6 +348,8 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
                 try { entity = world.getEntity(UUID.fromString(rs.getString("display_uuid"))); }
                 catch (IllegalArgumentException ex) { continue; }
                 if (!(entity instanceof TextDisplay display)) continue;
+                display.setText(bannerTitleColor(world.getName(), rs.getInt("x"), rs.getInt("y"), rs.getInt("z"))
+                        + ChatColor.BOLD.toString() + rs.getString("title"));
                 org.bukkit.Location bannerLocation = new org.bukkit.Location(world,
                     rs.getInt("x") + 0.5, rs.getInt("y") + 0.5, rs.getInt("z") + 0.5);
                 for (Player viewer : Bukkit.getOnlinePlayers()) {
