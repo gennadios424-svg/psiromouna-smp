@@ -863,6 +863,14 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         if (afkPlayers.contains(e.getPlayer().getUniqueId())) e.setCancelled(true);
     }
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onAfkInventoryDrag(org.bukkit.event.inventory.InventoryDragEvent e) {
+        if (e.getWhoClicked() instanceof Player p && afkPlayers.contains(p.getUniqueId())) e.setCancelled(true);
+    }
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onAfkPickup(org.bukkit.event.entity.EntityPickupItemEvent e) {
+        if (e.getEntity() instanceof Player p && afkPlayers.contains(p.getUniqueId())) e.setCancelled(true);
+    }
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onAfkInventory(InventoryClickEvent e) {
         if (e.getWhoClicked() instanceof Player p && afkPlayers.contains(p.getUniqueId())) e.setCancelled(true);
     }
