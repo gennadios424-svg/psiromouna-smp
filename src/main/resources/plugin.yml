@@ -1,5 +1,5 @@
 name: PsiromounaSMP
-version: 0.3.0
+version: 0.3.1
 main: com.psiromouna.smp.PsiromounaSMP
 api-version: '1.21'
 softdepend: [PlaceholderAPI]
