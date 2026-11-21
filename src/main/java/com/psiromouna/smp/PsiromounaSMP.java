@@ -835,8 +835,8 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         };
     }
     private void openQuantityMenu(Player p, Material material, org.bukkit.entity.EntityType spawnerType,
-                                  double unitPrice, String currency) {
-        MenuHolder h = new MenuHolder("buy-quantity", "", 0, material, spawnerType, unitPrice, currency);
+                                  double unitPrice, String currency, String category) {
+        MenuHolder h = new MenuHolder("buy-quantity", category, 0, material, spawnerType, unitPrice, currency);
         Inventory inv = Bukkit.createInventory(h, 27, ChatColor.DARK_GREEN + "Choose quantity");
         h.inv = inv;
         int[] amounts = {1, 16, 32, 64};
@@ -995,7 +995,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
             if (slot < 0 || slot >= 45) return;
             Material m = clicked.getType();
             double price = shopPrice(m);
-            openQuantityMenu(p, m, null, price, "lefta");
+            openQuantityMenu(p, m, null, price, "lefta", h.category);
             return;
         }
         if(h.type.equals("auction")) { if(clicked.hasItemMeta()&&clicked.getItemMeta().hasLore()){String line=clicked.getItemMeta().getLore().get(0);if(line.startsWith("Listing #")){auctionCommand(p,new String[]{"buy",line.substring(9)});openAuction(p);}}return; }
@@ -1026,14 +1026,14 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
             int index = h.page * 45 + slot;
             if (index >= SPAWNER_TYPES.size()) return;
             org.bukkit.entity.EntityType type = SPAWNER_TYPES.get(index);
-            openQuantityMenu(p, Material.SPAWNER, type, spawnerPrice(type), "shards");
+            openQuantityMenu(p, Material.SPAWNER, type, spawnerPrice(type), "shards", "spawners");
             return;
         }
         if (h.type.equals("buy-quantity")) {
             int slot = e.getRawSlot();
             if (slot == 18) {
                 if (h.spawnerType != null) openSpawnerShop(p);
-                else openShop(p);
+                else openShopCategory(p, h.category);
                 return;
             }
             int[] amounts = {1, 16, 32, 64};
@@ -1293,7 +1293,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
     public void onPvpTaggedInventoryDrag(org.bukkit.event.inventory.InventoryDragEvent e) {
         if (!(e.getWhoClicked() instanceof Player p) || !isPvpTagged(p)) return;
         if (!(e.getView().getTopInventory().getHolder() instanceof MenuHolder holder) ||
-                !(holder.type.equals("shop-categories") || holder.type.equals("shop-items") || holder.type.equals("spawners"))) e.setCancelled(true);
+                !(holder.type.equals("shop-categories") || holder.type.equals("shop-items") || holder.type.equals("spawner-types") || holder.type.equals("buy-quantity"))) e.setCancelled(true);
     }
 
     private void onQuitCleanup(Player p) {
