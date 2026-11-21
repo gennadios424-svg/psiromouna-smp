@@ -32,6 +32,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
     private final Map<UUID, Long> lastDisplay = new HashMap<>();
     private final Map<UUID, Long> pvpTaggedUntil = new HashMap<>();
     private final Set<UUID> afkPlayers = new HashSet<>();
+    private static final long AFK_COOLDOWN_MILLIS = 30L * 60L * 1000L;
     private static final long PVP_TAG_MILLIS = 15_000L;
     private static final String PREFIX = ChatColor.DARK_AQUA + "[SMP] " + ChatColor.RESET;
     private static final Map<Material, Double> DEFAULT_PRICES = new LinkedHashMap<>();
@@ -106,6 +107,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
                 s.executeUpdate("CREATE TABLE IF NOT EXISTS balances (uuid TEXT PRIMARY KEY, lefta REAL NOT NULL DEFAULT 0, shards REAL NOT NULL DEFAULT 0)");
                 s.executeUpdate("CREATE TABLE IF NOT EXISTS auctions (id INTEGER PRIMARY KEY AUTOINCREMENT, seller TEXT NOT NULL, seller_name TEXT NOT NULL, price REAL NOT NULL, item TEXT NOT NULL)");
                 s.executeUpdate("CREATE TABLE IF NOT EXISTS player_banners (owner TEXT PRIMARY KEY, world TEXT NOT NULL, x INTEGER NOT NULL, y INTEGER NOT NULL, z INTEGER NOT NULL, title TEXT NOT NULL, display_uuid TEXT)");
+                s.executeUpdate("CREATE TABLE IF NOT EXISTS afk_cooldowns (uuid TEXT PRIMARY KEY, until_ms INTEGER NOT NULL)");
             }
         } catch (Exception e) {
             getLogger().severe("Could not open economy database: " + e.getMessage());
@@ -331,7 +333,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
                 UUID displayId = null;
                 try { if (rs.getString("display_uuid") != null) displayId = UUID.fromString(rs.getString("display_uuid")); } catch (IllegalArgumentException ignored) {}
                 org.bukkit.entity.Entity entity = displayId == null ? null : world.getEntity(displayId);
-                if (entity instanceof TextDisplay display) display.setText(ChatColor.LIGHT_PURPLE.toString() + ChatColor.BOLD + rs.getString("title"));
+                if (entity instanceof TextDisplay display) display.setText(bannerTitleColor(rs.getString("world"), rs.getInt("x"), rs.getInt("y"), rs.getInt("z")) + ChatColor.BOLD.toString() + rs.getString("title"));
                 else spawnPlayerBanner(owner);
             }
         } catch (SQLException ex) { getLogger().warning("Could not refresh banner: " + ex.getMessage()); }
@@ -362,6 +364,26 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         }
     }
 
+    private ChatColor bannerTitleColor(String worldName, int x, int y, int z) {
+        org.bukkit.World world = Bukkit.getWorld(worldName);
+        if (world == null) return ChatColor.LIGHT_PURPLE;
+        org.bukkit.block.Block block = world.getBlockAt(x, y, z);
+        if (!(block.getState() instanceof org.bukkit.block.Banner banner)) return ChatColor.LIGHT_PURPLE;
+        return switch (banner.getBaseColor()) {
+            case WHITE -> ChatColor.WHITE;
+            case ORANGE, BROWN -> ChatColor.GOLD;
+            case MAGENTA, PINK -> ChatColor.LIGHT_PURPLE;
+            case LIGHT_BLUE, CYAN -> ChatColor.AQUA;
+            case YELLOW -> ChatColor.YELLOW;
+            case LIME, GREEN -> ChatColor.GREEN;
+            case GRAY, LIGHT_GRAY -> ChatColor.GRAY;
+            case PURPLE -> ChatColor.DARK_PURPLE;
+            case BLUE -> ChatColor.BLUE;
+            case RED -> ChatColor.RED;
+            case BLACK -> ChatColor.DARK_GRAY;
+        };
+    }
+
     private void spawnPlayerBanner(UUID owner) {
         try (PreparedStatement ps = db.prepareStatement("SELECT world,x,y,z,title,display_uuid FROM player_banners WHERE owner=?")) {
             ps.setString(1, owner.toString());
@@ -379,12 +401,12 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
                     existing.setVisibleByDefault(false);
                     existing.setViewRange(128.0f);
                     existing.setLineWidth(240);
-                    existing.setText(ChatColor.LIGHT_PURPLE.toString() + ChatColor.BOLD + rs.getString("title"));
+                    existing.setText(bannerTitleColor(world.getName(), x, y, z) + ChatColor.BOLD.toString() + rs.getString("title"));
                     return;
                 }
                 String title = rs.getString("title");
                 TextDisplay display = world.spawn(new org.bukkit.Location(world, x + 0.5, y + 20.0, z + 0.5), TextDisplay.class, entity -> {
-                    entity.setText(ChatColor.LIGHT_PURPLE.toString() + ChatColor.BOLD + title);
+                    entity.setText(bannerTitleColor(world.getName(), x, y, z) + ChatColor.BOLD.toString() + title);
                     entity.setBillboard(Display.Billboard.CENTER);
                     entity.setAlignment(TextDisplay.TextAlignment.CENTER);
                     entity.setVisibleByDefault(false);
@@ -560,13 +582,11 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         if (current + 1 < pages) inv.setItem(50, button(Material.SPECTRAL_ARROW, ChatColor.GREEN + "Next page"));
         p.openInventory(inv);
     }
-    private boolean shopMatches(Material m,String c) {
+    private boolean shopMatches(Material m, String c) {
         if (m == null || !m.isItem() || m.isAir()) return false;
         String n = m.name();
         return switch (c) {
-            // Only actual placeable blocks appear here, never tools or armor.
-            case "Blocks" -> m.isBlock() && !n.equals("SPAWNER")
-                    && !n.endsWith("_HEAD") && !n.endsWith("_SKULL");
+            case "Blocks" -> isBuildingBlock(m, n);
             case "PvP" -> Set.of("IRON_HELMET", "IRON_CHESTPLATE", "IRON_LEGGINGS", "IRON_BOOTS").contains(n);
             case "Farming" -> Set.of("WHEAT_SEEDS", "BEETROOT_SEEDS", "MELON_SEEDS", "PUMPKIN_SEEDS",
                     "WHEAT", "CARROT", "POTATO", "BEETROOT", "SUGAR_CANE", "PUMPKIN",
@@ -578,6 +598,32 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
                     "RAIL", "POWERED_RAIL", "DETECTOR_RAIL", "ACTIVATOR_RAIL", "TARGET").contains(n);
             default -> false;
         };
+    }
+    private boolean isBuildingBlock(Material m, String n) {
+        if (!m.isBlock() || n.contains("ORE") || n.equals("SPAWNER")) return false;
+        if (Set.of("ENCHANTING_TABLE", "CRAFTING_TABLE", "FURNACE", "BLAST_FURNACE", "SMOKER",
+                "ANVIL", "CHIPPED_ANVIL", "DAMAGED_ANVIL", "ENDER_CHEST", "CHEST", "TRAPPED_CHEST",
+                "BARREL", "HOPPER", "DISPENSER", "DROPPER", "BREWING_STAND", "BEACON", "CONDUIT",
+                "LECTERN", "LOOM", "CARTOGRAPHY_TABLE", "FLETCHING_TABLE", "SMITHING_TABLE",
+                "STONECUTTER", "GRINDSTONE", "COMPOSTER", "BEEHIVE", "BEE_NEST", "JUKEBOX",
+                "NOTE_BLOCK", "OBSERVER", "PISTON", "STICKY_PISTON", "REDSTONE_LAMP",
+                "DAYLIGHT_DETECTOR").contains(n)) return false;
+        return n.endsWith("_LOG") || n.endsWith("_WOOD") || n.endsWith("_PLANKS")
+                || n.endsWith("_STAIRS") || n.endsWith("_SLAB") || n.endsWith("_WALL")
+                || n.endsWith("_FENCE") || n.endsWith("_FENCE_GATE") || n.endsWith("_DOOR")
+                || n.endsWith("_TRAPDOOR") || n.endsWith("_WOOL") || n.endsWith("_CARPET")
+                || n.endsWith("_GLASS") || n.endsWith("_GLASS_PANE") || n.endsWith("_TERRACOTTA")
+                || n.endsWith("_CONCRETE") || n.endsWith("_CONCRETE_POWDER") || n.endsWith("_BRICKS")
+                || n.endsWith("_LEAVES") || n.endsWith("_MUSHROOM_BLOCK") || n.endsWith("_CORAL_BLOCK")
+                || n.endsWith("_BASALT") || n.endsWith("_STONE") || n.endsWith("_DEEPSLATE")
+                || n.endsWith("_SANDSTONE") || n.endsWith("_QUARTZ_BLOCK") || n.endsWith("_PRISMARINE")
+                || Set.of("STONE", "COBBLESTONE", "MOSSY_COBBLESTONE", "DIRT", "GRASS_BLOCK", "SAND",
+                "RED_SAND", "GRAVEL", "CLAY", "BRICKS", "BOOKSHELF", "MOSS_BLOCK", "MUD",
+                "PACKED_MUD", "MUD_BRICKS", "OBSIDIAN", "CRYING_OBSIDIAN", "END_STONE",
+                "END_STONE_BRICKS", "NETHER_BRICKS", "RED_NETHER_BRICKS", "BLACKSTONE",
+                "POLISHED_BLACKSTONE", "GILDED_BLACKSTONE", "QUARTZ_BLOCK", "PRISMARINE",
+                "DARK_PRISMARINE", "SEA_LANTERN", "GLOWSTONE", "ICE", "PACKED_ICE", "BLUE_ICE",
+                "SNOW_BLOCK", "HAY_BLOCK", "BONE_BLOCK", "MELON", "PUMPKIN", "JACK_O_LANTERN").contains(n);
     }
     private void openSpawnerShop(Player p) {
         MenuHolder h=new MenuHolder("spawners"); Inventory inv=Bukkit.createInventory(h,27,ChatColor.DARK_AQUA+"Shard Shop"); h.inv=inv;
@@ -799,19 +845,41 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         }
     }
 
+    private long afkCooldownUntil(UUID id) {
+        try (PreparedStatement ps = db.prepareStatement("SELECT until_ms FROM afk_cooldowns WHERE uuid=?")) {
+            ps.setString(1, id.toString());
+            try (ResultSet rs = ps.executeQuery()) { return rs.next() ? rs.getLong(1) : 0L; }
+        } catch (SQLException ex) { return 0L; }
+    }
+    private void setAfkCooldown(UUID id, long until) {
+        try (PreparedStatement ps = db.prepareStatement("INSERT OR REPLACE INTO afk_cooldowns(uuid,until_ms) VALUES(?,?)")) {
+            ps.setString(1, id.toString()); ps.setLong(2, until); ps.executeUpdate();
+        } catch (SQLException ex) { getLogger().warning("Could not save AFK cooldown: " + ex.getMessage()); }
+    }
     private boolean afkCommand(Player p) {
         UUID id = p.getUniqueId();
-        if (afkPlayers.remove(id)) {
+        if (afkPlayers.contains(id)) {
+            afkPlayers.remove(id);
             p.setInvulnerable(false);
             p.setWalkSpeed(0.2f);
             p.setFlySpeed(0.1f);
-            p.sendMessage(PREFIX + ChatColor.GREEN + "You are no longer AFK.");
-        } else {
-            afkPlayers.add(id);
-            p.setInvulnerable(true);
-            p.setVelocity(new org.bukkit.util.Vector(0, 0, 0));
-            p.sendMessage(PREFIX + ChatColor.YELLOW + "You are now AFK. You are protected and frozen until you use /afk again.");
+            p.setPlayerListName(p.getName());
+            p.sendMessage(PREFIX + ChatColor.GREEN + "You are no longer AFK. You can use /afk again after the 30-minute cooldown.");
+            return true;
         }
+        long now = System.currentTimeMillis();
+        long until = afkCooldownUntil(id);
+        if (until > now) {
+            long minutes = Math.max(1L, (until - now + 59_999L) / 60_000L);
+            p.sendMessage(PREFIX + ChatColor.RED + "AFK is on cooldown. You can use it again in " + minutes + " minute(s).");
+            return true;
+        }
+        setAfkCooldown(id, now + AFK_COOLDOWN_MILLIS);
+        afkPlayers.add(id);
+        p.setInvulnerable(true);
+        p.setVelocity(new org.bukkit.util.Vector(0, 0, 0));
+        p.setPlayerListName(ChatColor.YELLOW + "[AFK] " + ChatColor.RESET + p.getName());
+        p.sendMessage(PREFIX + ChatColor.YELLOW + "You are now AFK. You are protected and frozen until you use /afk again.");
         return true;
     }
 
@@ -953,27 +1021,30 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
     @EventHandler public void onQuit(org.bukkit.event.player.PlayerQuitEvent e) { onQuitCleanup(e.getPlayer()); }
 
     private void updateDisplays(Player p) {
-        double lefta=getBalance(p.getUniqueId(),"lefta"), shards=getBalance(p.getUniqueId(),"shards");
-        p.setPlayerListHeaderFooter(ChatColor.DARK_AQUA+"✦ PSIROMOUNA SMP ✦\n"+ChatColor.GRAY+"Survive • Trade • Build",
-                ChatColor.GOLD+"Lefta: "+money(lefta)+"   "+ChatColor.AQUA+"Shards: "+money(shards)+"\n"+ChatColor.GRAY+"Players: "+Bukkit.getOnlinePlayers().size()+"/"+Bukkit.getMaxPlayers());
-        Scoreboard board=Bukkit.getScoreboardManager().getNewScoreboard();
+        double lefta = getBalance(p.getUniqueId(), "lefta");
+        double shards = getBalance(p.getUniqueId(), "shards");
+        p.setPlayerListName(afkPlayers.contains(p.getUniqueId())
+                ? ChatColor.YELLOW + "[AFK] " + ChatColor.RESET + p.getName() : p.getName());
+        p.setCustomName(p.getName() + ChatColor.GRAY + " | " + ChatColor.GOLD + "€" + money(lefta));
+        p.setCustomNameVisible(true);
+        p.setPlayerListHeaderFooter(ChatColor.DARK_AQUA + "✦ PSIROMOUNA SMP ✦\n" + ChatColor.GRAY + "Survive • Trade • Build",
+                ChatColor.GOLD + "Lefta: " + money(lefta) + "   " + ChatColor.AQUA + "Shards: " + money(shards) + "\n"
+                        + ChatColor.GRAY + "Players: " + Bukkit.getOnlinePlayers().size() + "/" + Bukkit.getMaxPlayers());
+        Scoreboard board = Bukkit.getScoreboardManager().getNewScoreboard();
         ChatColor pink = ChatColor.LIGHT_PURPLE;
-        Objective obj=board.registerNewObjective("smpinfo",Criteria.DUMMY,pink+""+ChatColor.BOLD+"✦ PSIROMOUNA ✦");
+        Objective obj = board.registerNewObjective("smpinfo", Criteria.DUMMY, pink + "" + ChatColor.BOLD + "✦ PSIROMOUNA ✦");
         obj.setDisplaySlot(DisplaySlot.SIDEBAR);
         String[] lines = {
-                pink + "" + ChatColor.BOLD + "ONLINE",
+                ChatColor.GRAY + "" + ChatColor.BOLD + "ONLINE",
                 ChatColor.WHITE + "" + Bukkit.getOnlinePlayers().size() + "/" + Bukkit.getMaxPlayers(),
                 ChatColor.DARK_GRAY + " ",
-                pink + "" + ChatColor.BOLD + "YOUR BALANCE",
-                ChatColor.WHITE + "Lefta: " + ChatColor.GOLD + money(lefta),
-                ChatColor.WHITE + "✦ " + pink + money(shards) + " Shards",
-                ChatColor.DARK_PURPLE + "psiromouna SMP"
+                ChatColor.GRAY + "" + ChatColor.BOLD + "YOUR BALANCE",
+                ChatColor.WHITE + "Lefta: " + ChatColor.GOLD + "€" + money(lefta),
+                ChatColor.WHITE + "✦ " + ChatColor.AQUA + money(shards) + " Shards",
+                ChatColor.DARK_GRAY + "psiromouna SMP"
         };
         int score = lines.length;
-        for (String line : lines) {
-            org.bukkit.scoreboard.Score entry = obj.getScore(line);
-            entry.setScore(score--);
-        }
+        for (String line : lines) obj.getScore(line).setScore(score--);
         p.setScoreboard(board);
     }
 
