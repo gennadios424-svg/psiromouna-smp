@@ -171,13 +171,13 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
                     List<Material> matches = Arrays.stream(Material.values()).filter(m -> !m.isAir() && worth(m) > 0 &&
                             (m.name().toLowerCase(Locale.ROOT).contains(q.replace(' ', '_')) || nice(m).toLowerCase(Locale.ROOT).contains(q))).limit(20).toList();
                     if (matches.isEmpty()) p.sendMessage(PREFIX + ChatColor.YELLOW + "No priced items found.");
-                    else { p.sendMessage(ChatColor.GOLD + "Worth search: " + q); for (Material m : matches) p.sendMessage(ChatColor.YELLOW + nice(m) + ChatColor.GRAY + " — " + ChatColor.GOLD + money(worth(m)) + " € each"); }
+                    else { p.sendMessage(ChatColor.GOLD + "Worth search: " + q); for (Material m : matches) p.sendMessage(ChatColor.YELLOW + nice(m) + ChatColor.GRAY + " — " + ChatColor.GOLD + "€" + money(worth(m)) + " each"); }
                     return true;
                 }
                 Material m = args[0].equalsIgnoreCase("hand") ? p.getInventory().getItemInMainHand().getType()
                         : Material.matchMaterial(String.join("_", args).toUpperCase(Locale.ROOT));
                 if (m == null || m.isAir()) p.sendMessage(PREFIX + ChatColor.RED + "Unknown item. Try /worth search <text>.");
-                else p.sendMessage(PREFIX + ChatColor.YELLOW + nice(m) + ChatColor.GRAY + " is worth " + ChatColor.GOLD + money(worth(m)) + " Lefta each.");
+                else p.sendMessage(PREFIX + ChatColor.YELLOW + nice(m) + ChatColor.GRAY + " is worth " + ChatColor.GOLD + "€" + money(worth(m)) + " each.");
                 return true;
             }
             case "sell" -> {
@@ -196,14 +196,14 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
                         sold += item.getAmount(); total += price * item.getAmount(); p.getInventory().setItem(i, null);
                     }
                     if (sold == 0) p.sendMessage(PREFIX + "You have no items with a sell value.");
-                    else { changeBalance(p.getUniqueId(), "lefta", total); p.sendMessage(PREFIX + ChatColor.GREEN + "Sold " + sold + " items for " + money(total) + " €."); }
+                    else { changeBalance(p.getUniqueId(), "lefta", total); p.sendMessage(PREFIX + ChatColor.GREEN + "Sold " + sold + " items for €" + money(total) + "."); }
                     return true;
                 }
                 p.sendMessage(PREFIX + "Usage: /sell [hand|all]"); return true;
             }
             case "shop", "buy" -> { openShop(p); return true; }
             case "balance" -> {
-                p.sendMessage(PREFIX + ChatColor.GREEN + "Euros: €" + ChatColor.GOLD + money(getBalance(p.getUniqueId(), "lefta"))
+                p.sendMessage(PREFIX + ChatColor.GREEN + "Lefta: " + ChatColor.GOLD + money(getBalance(p.getUniqueId(), "lefta"))
                         + ChatColor.GRAY + " | Shards: " + ChatColor.AQUA + money(getBalance(p.getUniqueId(), "shards")));
                 return true;
             }
@@ -218,7 +218,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         double total = price * amount;
         item.setAmount(item.getAmount() - amount);
         changeBalance(p.getUniqueId(), "lefta", total);
-        p.sendMessage(PREFIX + ChatColor.GREEN + "Sold " + amount + "x " + nice(item.getType()) + " for " + money(total) + " Lefta.");
+        p.sendMessage(PREFIX + ChatColor.GREEN + "Sold " + amount + "x " + nice(item.getType()) + " for €" + money(total) + ".");
     }
 
     private boolean currencyCommand(CommandSender sender, String[] args) {
@@ -260,7 +260,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         int start = current * 45;
         for (int i = start; i < Math.min(start + 45, list.size()); i++) {
             Material m = list.get(i);
-            inv.setItem(i - start, button(m, ChatColor.YELLOW + nice(m), ChatColor.GRAY + money(worth(m)) + " Lefta each"));
+            inv.setItem(i - start, button(m, ChatColor.YELLOW + nice(m), ChatColor.GRAY + "€" + money(worth(m)) + " each"));
         }
         inv.setItem(45, button(Material.ARROW, ChatColor.RED + "Back", "Worth categories"));
         if (current > 0) inv.setItem(48, button(Material.SPECTRAL_ARROW, ChatColor.YELLOW + "Previous page"));
@@ -291,7 +291,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
 
     private void openCommands(Player p) {
         MenuHolder h=new MenuHolder("commands"); Inventory inv=Bukkit.createInventory(h,27,ChatColor.DARK_AQUA+"Psiromouna Commands"); h.inv=inv;
-        inv.setItem(10,button(Material.EMERALD,ChatColor.GREEN+"/balance","View Euros and Shards"));
+        inv.setItem(10,button(Material.EMERALD,ChatColor.GREEN+"/balance","View Lefta and Shards"));
         inv.setItem(11,button(Material.GOLD_INGOT,ChatColor.YELLOW+"/buy","Browse the shop"));
         inv.setItem(12,button(Material.BOOK,ChatColor.AQUA+"/worth","Search item values"));
         inv.setItem(13,button(Material.HOPPER,ChatColor.GREEN+"/sell","Open sell chest"));
@@ -313,7 +313,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
                 if(meta!=null) {
                     List<String> lore=new ArrayList<>();
                     lore.add(ChatColor.GOLD+""+ChatColor.BOLD+"PRICE");
-                    lore.add(ChatColor.YELLOW+"€ "+ChatColor.WHITE+ChatColor.BOLD+money(rs.getDouble("price"))+" Lefta");
+                    lore.add(ChatColor.YELLOW+"€ "+ChatColor.WHITE+ChatColor.BOLD+money(rs.getDouble("price")));
                     lore.add(ChatColor.DARK_GRAY+"----------------");
                     lore.add(ChatColor.GRAY+"Seller: "+ChatColor.LIGHT_PURPLE+rs.getString("seller_name"));
                     lore.add(ChatColor.GRAY+"Amount: "+ChatColor.WHITE+"x"+it.getAmount());
@@ -341,7 +341,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         for (int i = start; i < Math.min(start + 45, items.size()); i++) {
             Material m = items.get(i);
             double price = Math.max(400, Math.ceil(worth(m) * 2));
-            inv.setItem(i - start, button(m, ChatColor.YELLOW + nice(m), ChatColor.GRAY + "Price: " + money(price) + " Lefta"));
+            inv.setItem(i - start, button(m, ChatColor.YELLOW + nice(m), ChatColor.GRAY + "Price: €" + money(price)));
         }
         inv.setItem(45, button(Material.ARROW, ChatColor.RED + "Back", "Categories"));
         if (current > 0) inv.setItem(48, button(Material.SPECTRAL_ARROW, ChatColor.YELLOW + "Previous page"));
@@ -453,7 +453,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
                     if (it != null && !it.getType().isAir() && worth(it.getType()) > 0) h.inv.setItem(i, null);
                 }
                 changeBalance(p.getUniqueId(), "lefta", total);
-                p.sendMessage(PREFIX + ChatColor.GREEN + "Sold " + count + " items for " + money(total) + " Lefta.");
+                p.sendMessage(PREFIX + ChatColor.GREEN + "Sold " + count + " items for €" + money(total) + ".");
                 p.closeInventory();
             }
             return;
@@ -598,7 +598,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
     private void updateDisplays(Player p) {
         double lefta=getBalance(p.getUniqueId(),"lefta"), shards=getBalance(p.getUniqueId(),"shards");
         p.setPlayerListHeaderFooter(ChatColor.DARK_AQUA+"✦ PSIROMOUNA SMP ✦\n"+ChatColor.GRAY+"Survive • Trade • Build",
-                ChatColor.GOLD+"€ "+money(lefta)+"   "+ChatColor.AQUA+"Shards: "+money(shards)+"\n"+ChatColor.GRAY+"Players: "+Bukkit.getOnlinePlayers().size()+"/"+Bukkit.getMaxPlayers());
+                ChatColor.GOLD+"Lefta: "+money(lefta)+"   "+ChatColor.AQUA+"Shards: "+money(shards)+"\n"+ChatColor.GRAY+"Players: "+Bukkit.getOnlinePlayers().size()+"/"+Bukkit.getMaxPlayers());
         Scoreboard board=Bukkit.getScoreboardManager().getNewScoreboard();
         ChatColor pink = ChatColor.LIGHT_PURPLE;
         Objective obj=board.registerNewObjective("smpinfo",Criteria.DUMMY,pink+""+ChatColor.BOLD+"✦ PSIROMOUNA ✦");
@@ -608,7 +608,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
                 ChatColor.WHITE + "" + Bukkit.getOnlinePlayers().size() + "/" + Bukkit.getMaxPlayers(),
                 ChatColor.DARK_GRAY + " ",
                 pink + "" + ChatColor.BOLD + "YOUR BALANCE",
-                ChatColor.WHITE + "€ " + ChatColor.GOLD + money(lefta),
+                ChatColor.WHITE + "Lefta: " + ChatColor.GOLD + money(lefta),
                 ChatColor.WHITE + "✦ " + pink + money(shards) + " Shards",
                 ChatColor.DARK_PURPLE + "psiromouna SMP"
         };
