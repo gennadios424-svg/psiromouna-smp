@@ -1027,8 +1027,6 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         double shards = getBalance(p.getUniqueId(), "shards");
         p.setPlayerListName(afkPlayers.contains(p.getUniqueId())
                 ? ChatColor.YELLOW + "[AFK] " + ChatColor.RESET + p.getName() : p.getName());
-        p.setCustomName(p.getName() + ChatColor.GRAY + " | " + ChatColor.GOLD + "€" + money(lefta));
-        p.setCustomNameVisible(true);
         p.setPlayerListHeaderFooter(ChatColor.DARK_AQUA + "✦ PSIROMOUNA SMP ✦\n" + ChatColor.GRAY + "Survive • Trade • Build",
                 ChatColor.GOLD + "Lefta: " + money(lefta) + "   " + ChatColor.AQUA + "Shards: " + money(shards) + "\n"
                         + ChatColor.GRAY + "Players: " + Bukkit.getOnlinePlayers().size() + "/" + Bukkit.getMaxPlayers());
@@ -1047,6 +1045,14 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         };
         int score = lines.length;
         for (String line : lines) obj.getScore(line).setScore(score--);
+        for (Player target : Bukkit.getOnlinePlayers()) {
+            String teamId = "cash" + target.getUniqueId().toString().replace("-", "").substring(0, 8);
+            Team nameTag = board.registerNewTeam(teamId);
+            nameTag.addEntry(target.getName());
+            if (afkPlayers.contains(target.getUniqueId())) nameTag.setPrefix(ChatColor.YELLOW + "[AFK] " + ChatColor.RESET);
+            nameTag.setSuffix(ChatColor.GRAY + " | " + ChatColor.GOLD + "€"
+                    + money(getBalance(target.getUniqueId(), "lefta")));
+        }
         p.setScoreboard(board);
     }
 
