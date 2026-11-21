@@ -333,13 +333,21 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         p.openInventory(inv);
     }
     private boolean shopMatches(Material m,String c) {
-        String n=m.name();
-        return switch(c) {
+        if (m == null || !m.isItem() || m.isAir()) return false;
+        String n = m.name();
+        return switch (c) {
+            // Only actual placeable blocks appear here, never tools or armor.
+            case "Blocks" -> m.isBlock() && !n.equals("SPAWNER")
+                    && !n.endsWith("_HEAD") && !n.endsWith("_SKULL");
             case "PvP" -> Set.of("IRON_HELMET", "IRON_CHESTPLATE", "IRON_LEGGINGS", "IRON_BOOTS").contains(n);
-            case "Blocks" -> n.contains("STONE")||n.contains("DIRT")||n.contains("LOG")||n.contains("PLANK")||n.contains("WOOL")||n.contains("GLASS")||n.contains("BRICK")||n.contains("OBSIDIAN")||n.contains("SAND");
-            case "Farming" -> n.contains("SEEDS")||n.contains("WHEAT")||n.contains("CARROT")||n.contains("POTATO")||n.contains("SUGAR_CANE")||n.contains("PUMPKIN")||n.contains("MELON")||n.contains("KELP")||n.contains("PICKLE")||n.contains("PETAL");
-            case "Food" -> n.contains("BREAD")||n.contains("COOKED_")||n.contains("APPLE")||n.contains("BEEF")||n.contains("PORKCHOP")||n.contains("CHICKEN")||n.contains("FISH");
-            case "Redstone" -> n.contains("REDSTONE")||n.contains("PISTON")||n.contains("HOPPER")||n.contains("REPEATER")||n.contains("COMPARATOR")||n.contains("OBSERVER")||n.contains("DISPENSER")||n.contains("DROPPER")||n.contains("LEVER")||n.contains("BUTTON")||n.contains("RAIL");
+            case "Farming" -> Set.of("WHEAT_SEEDS", "BEETROOT_SEEDS", "MELON_SEEDS", "PUMPKIN_SEEDS",
+                    "WHEAT", "CARROT", "POTATO", "BEETROOT", "SUGAR_CANE", "PUMPKIN",
+                    "MELON_SLICE", "KELP", "SEA_PICKLE", "PINK_PETALS").contains(n);
+            case "Food" -> m.isEdible();
+            case "Redstone" -> Set.of("REDSTONE", "REDSTONE_BLOCK", "REDSTONE_TORCH", "REDSTONE_LAMP",
+                    "PISTON", "STICKY_PISTON", "HOPPER", "REPEATER", "COMPARATOR", "OBSERVER",
+                    "DISPENSER", "DROPPER", "LEVER", "STONE_BUTTON", "OAK_BUTTON",
+                    "RAIL", "POWERED_RAIL", "DETECTOR_RAIL", "ACTIVATOR_RAIL", "TARGET").contains(n);
             default -> false;
         };
     }
