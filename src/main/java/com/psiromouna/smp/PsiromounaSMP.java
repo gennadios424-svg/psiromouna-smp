@@ -476,7 +476,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
             if (getBalance(p.getUniqueId(), "lefta") < price) { p.sendMessage(PREFIX + "Not enough Lefta. This item costs " + money(price) + "."); return; }
             if (!p.getInventory().addItem(new ItemStack(m, 1)).isEmpty()) { p.sendMessage(PREFIX + "Inventory full."); return; }
             changeBalance(p.getUniqueId(), "lefta", -price);
-            p.sendMessage(PREFIX + "Bought " + nice(m) + " for " + money(price) + " Lefta.");
+            p.sendMessage(PREFIX + "Bought " + nice(m) + " for €" + money(price) + ".");
             return;
         }
         if(h.type.equals("auction")) { if(clicked.hasItemMeta()&&clicked.getItemMeta().hasLore()){String line=clicked.getItemMeta().getLore().get(0);if(line.startsWith("Listing #")){auctionCommand(p,new String[]{"buy",line.substring(9)});openAuction(p);}}return; }
@@ -496,7 +496,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
             Material m=clicked.getType(); double price=Math.max(1,worth(m)*2);
             if(getBalance(p.getUniqueId(),"lefta")<price){p.sendMessage(PREFIX+ChatColor.RED+"Not enough Lefta.");return;}
             if(!p.getInventory().addItem(new ItemStack(m,1)).isEmpty()){p.sendMessage(PREFIX+"Your inventory is full.");return;}
-            changeBalance(p.getUniqueId(),"lefta",-price); p.sendMessage(PREFIX+ChatColor.GREEN+"Bought "+nice(m)+" for "+money(price)+" Lefta."); return;
+            changeBalance(p.getUniqueId(),"lefta",-price); p.sendMessage(PREFIX+ChatColor.GREEN+"Bought "+nice(m)+" for €"+money(price)+".); return;
         }
         if(h.type.equals("spawners")&&e.getRawSlot()==13){
             if(getBalance(p.getUniqueId(),"shards")<25){p.sendMessage(PREFIX+ChatColor.RED+"Not enough Shards.");return;}
@@ -518,7 +518,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
                 String encoded=encodeItem(hand); try(PreparedStatement ps=db.prepareStatement("INSERT INTO auctions(seller,seller_name,price,item) VALUES(?,?,?,?)")) {
                     ps.setString(1,p.getUniqueId().toString());ps.setString(2,p.getName());ps.setDouble(3,price);ps.setString(4,encoded);ps.executeUpdate();
                 }
-                p.getInventory().setItemInMainHand(null);p.sendMessage(PREFIX+ChatColor.GREEN+"Listed item for "+money(price)+" Lefta.");
+                p.getInventory().setItemInMainHand(null);p.sendMessage(PREFIX+ChatColor.GREEN+"Listed item for €"+money(price)+".);
             } catch(Exception ex){p.sendMessage(PREFIX+ChatColor.RED+"Invalid price or listing error.");}
             return true;
         }
