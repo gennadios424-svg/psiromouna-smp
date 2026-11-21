@@ -130,23 +130,26 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         return Arrays.stream(bits).map(s -> Character.toUpperCase(s.charAt(0)) + s.substring(1)).collect(Collectors.joining(" "));
     }
     private double worth(Material m) {
-        if (getConfig().contains("prices." + m.name())) return getConfig().getDouble("prices." + m.name());
+        if (m == null || m.isAir() || !m.isItem()) return 0;
+        if (getConfig().contains("prices." + m.name())) {
+            double configured = getConfig().getDouble("prices." + m.name());
+            if (Double.isFinite(configured) && configured > 0) return configured;
+        }
         if (DEFAULT_PRICES.containsKey(m)) return DEFAULT_PRICES.get(m);
-        if (m.isAir() || !m.isItem()) return 0;
-        String n=m.name();
+        String n = m.name();
         if (n.contains("ELYTRA")) return 2500;
-        if (n.contains("NETHERITE")) return 350;
-        if (n.contains("TOTEM")) return 900;
-        if (n.contains("SHULKER")) return 150;
+        if (n.contains("NETHERITE")) return 1200;
+        if (n.contains("TOTEM")) return 1800;
+        if (n.contains("SHULKER")) return 500;
         if (n.contains("DIAMOND")) return 500;
-        if (n.contains("TRIDENT") || n.contains("HEART_OF_THE_SEA")) return 800;
+        if (n.contains("TRIDENT") || n.contains("HEART_OF_THE_SEA")) return 1600;
         if (n.contains("SPAWN_EGG") || n.contains("SPAWNER")) return 0;
-        if (n.contains("ANCIENT_DEBRIS")) return 300;
+        if (n.contains("ANCIENT_DEBRIS")) return 900;
         if (n.contains("KELP")) return 125;
-        if (n.contains("PICKLE") || n.contains("PETAL")) return 175;
+        if (n.contains("PICKLE") || n.contains("PETAL")) return 125;
         if (n.contains("LOG") || n.contains("PLANKS")) return 4;
         if (n.contains("SEEDS") || n.contains("WHEAT") || n.contains("CARROT") || n.contains("POTATO")) return 2;
-        if (n.contains("STONE") || n.contains("DIRT") || n.contains("COBBLE")) return 0.5;
+        if (n.contains("STONE") || n.contains("DIRT") || n.contains("COBBLE")) return 1;
         if (n.contains("COOKED_") || n.contains("BREAD")) return 8;
         if (n.contains("WOOL") || n.contains("GLASS")) return 3;
         if (n.contains("BONE") || n.contains("STRING") || n.contains("ROTTEN_FLESH")) return 2;
@@ -244,10 +247,25 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         for (int i=0;i<labels.length;i++) inv.setItem(10+i, button(icons[i], ChatColor.GREEN + labels[i], "Browse prices"));
         p.openInventory(inv);
     }
-    private void openWorthCategory(Player p, String category) {
-        List<Material> list = Arrays.stream(Material.values()).filter(m -> worth(m)>0 && categoryMatches(m,category)).sorted(Comparator.comparing(Material::name)).limit(45).toList();
-        MenuHolder h = new MenuHolder("worth-items"); Inventory inv = Bukkit.createInventory(h,54,ChatColor.DARK_GREEN+"Worth: "+category); h.inv=inv;
-        int slot=0; for(Material m:list) inv.setItem(slot++, button(m,ChatColor.YELLOW+nice(m),ChatColor.GRAY+money(worth(m))+" Lefta each"));
+    private void openWorthCategory(Player p, String category) { openWorthCategory(p, category, 0); }
+    private void openWorthCategory(Player p, String category, int page) {
+        List<Material> list = Arrays.stream(Material.values())
+                .filter(m -> m.isItem() && !m.isAir() && worth(m) > 0 && categoryMatches(m, category))
+                .sorted(Comparator.comparing(Material::name)).toList();
+        int pages = Math.max(1, (list.size() + 44) / 45);
+        int current = Math.max(0, Math.min(page, pages - 1));
+        MenuHolder h = new MenuHolder("worth-items", category, current);
+        Inventory inv = Bukkit.createInventory(h, 54, ChatColor.DARK_GREEN + "Worth: " + category + " (" + (current + 1) + "/" + pages + ")");
+        h.inv = inv;
+        int start = current * 45;
+        for (int i = start; i < Math.min(start + 45, list.size()); i++) {
+            Material m = list.get(i);
+            inv.setItem(i - start, button(m, ChatColor.YELLOW + nice(m), ChatColor.GRAY + money(worth(m)) + " Lefta each"));
+        }
+        inv.setItem(45, button(Material.ARROW, ChatColor.RED + "Back", "Worth categories"));
+        if (current > 0) inv.setItem(48, button(Material.SPECTRAL_ARROW, ChatColor.YELLOW + "Previous page"));
+        inv.setItem(49, button(Material.PAPER, ChatColor.GOLD + "Page " + (current + 1) + "/" + pages, "Items: " + list.size()));
+        if (current + 1 < pages) inv.setItem(50, button(Material.SPECTRAL_ARROW, ChatColor.GREEN + "Next page"));
         p.openInventory(inv);
     }
     private boolean categoryMatches(Material m,String c) {
@@ -292,16 +310,34 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         } catch(Exception ex) { p.sendMessage(PREFIX+"Could not load auctions."); }
         p.openInventory(inv);
     }
-    private void openShopCategory(Player p,String category) {
-        MenuHolder h=new MenuHolder("shop-items"); Inventory inv=Bukkit.createInventory(h,54,ChatColor.DARK_BLUE+"Shop: "+category); h.inv=inv;
-        List<Material> items=Arrays.stream(Material.values()).filter(m->m.isItem()&&!m.isAir()&&worth(m)>0&&shopMatches(m,category)).limit(45).toList();
-        int i=0; for(Material m:items) inv.setItem(i++,button(m,ChatColor.YELLOW+nice(m),ChatColor.GRAY+"Price: €"+money(Math.max(1,worth(m)*2))));
-        inv.setItem(49,button(Material.ARROW,ChatColor.RED+"Back","Categories")); p.openInventory(inv);
+    private void openShopCategory(Player p,String category) { openShopCategory(p, category, 0); }
+    private void openShopCategory(Player p, String category, int page) {
+        List<Material> items = Arrays.stream(Material.values())
+                .filter(m -> m.isItem() && !m.isAir() && worth(m) > 0 && shopMatches(m, category))
+                .sorted(Comparator.comparing(Material::name)).toList();
+        int pages = Math.max(1, (items.size() + 44) / 45);
+        int current = Math.max(0, Math.min(page, pages - 1));
+        MenuHolder h = new MenuHolder("shop-items", category, current);
+        Inventory inv = Bukkit.createInventory(h, 54, ChatColor.DARK_BLUE + "Shop: " + category + " (" + (current + 1) + "/" + pages + ")");
+        h.inv = inv;
+        int start = current * 45;
+        for (int i = start; i < Math.min(start + 45, items.size()); i++) {
+            Material m = items.get(i);
+            double price = Math.max(400, Math.ceil(worth(m) * 2));
+            inv.setItem(i - start, button(m, ChatColor.YELLOW + nice(m), ChatColor.GRAY + "Price: " + money(price) + " Lefta"));
+        }
+        inv.setItem(45, button(Material.ARROW, ChatColor.RED + "Back", "Categories"));
+        if (current > 0) inv.setItem(48, button(Material.SPECTRAL_ARROW, ChatColor.YELLOW + "Previous page"));
+        inv.setItem(49, button(Material.PAPER, ChatColor.GOLD + "Page " + (current + 1) + "/" + pages, "Items: " + items.size()));
+        if (current + 1 < pages) inv.setItem(50, button(Material.SPECTRAL_ARROW, ChatColor.GREEN + "Next page"));
+        p.openInventory(inv);
     }
     private boolean shopMatches(Material m,String c) {
         String n=m.name();
         return switch(c) {
-            case "PvP" -> n.contains("SWORD")||n.contains("AXE")||n.contains("BOW")||n.contains("CROSSBOW")||n.contains("ARROW")||n.contains("SHIELD")||n.contains("HELMET")||n.contains("CHESTPLATE")||n.contains("LEGGINGS")||n.contains("BOOTS");
+            case "PvP" -> Set.of("IRON_SWORD", "IRON_AXE", "IRON_PICKAXE", "IRON_SHOVEL", "IRON_HOE",
+                    "IRON_HELMET", "IRON_CHESTPLATE", "IRON_LEGGINGS", "IRON_BOOTS",
+                    "SHIELD", "BOW", "ARROW").contains(n);
             case "Blocks" -> n.contains("STONE")||n.contains("DIRT")||n.contains("LOG")||n.contains("PLANK")||n.contains("WOOL")||n.contains("GLASS")||n.contains("BRICK")||n.contains("OBSIDIAN")||n.contains("SAND");
             case "Farming" -> n.contains("SEEDS")||n.contains("WHEAT")||n.contains("CARROT")||n.contains("POTATO")||n.contains("SUGAR_CANE")||n.contains("PUMPKIN")||n.contains("MELON")||n.contains("KELP")||n.contains("PICKLE")||n.contains("PETAL");
             case "Food" -> n.contains("BREAD")||n.contains("COOKED_")||n.contains("APPLE")||n.contains("BEEF")||n.contains("PORKCHOP")||n.contains("CHICKEN")||n.contains("FISH");
@@ -332,11 +368,31 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
             } else if(e.getRawSlot()>=45)e.setCancelled(true); return;
         }
         if(h.type.equals("shop-categories")) { String[] cats={"PvP","Blocks","Farming","Spawners","Food","Redstone"};int ix=e.getRawSlot()-10;if(ix>=0&&ix<6){if(ix==3)openSpawnerShop(p);else openShopCategory(p,cats[ix]);}return; }
-        if(h.type.equals("shop-items")) { if(e.getRawSlot()==49){openShop(p);return;} Material m=clicked.getType();double price=Math.max(1,worth(m)*2);if(getBalance(p.getUniqueId(),"lefta")<price){p.sendMessage(PREFIX+"Not enough Euros.");return;}if(!p.getInventory().addItem(new ItemStack(m)).isEmpty()){p.sendMessage(PREFIX+"Inventory full.");return;}changeBalance(p.getUniqueId(),"lefta",-price);p.sendMessage(PREFIX+"Bought "+nice(m)+" for €"+money(price));return; }
+        if(h.type.equals("shop-items")) {
+            int slot = e.getRawSlot();
+            if (slot == 45) { openShop(p); return; }
+            if (slot == 48 && h.page > 0) { openShopCategory(p, h.category, h.page - 1); return; }
+            if (slot == 50) { openShopCategory(p, h.category, h.page + 1); return; }
+            if (slot < 0 || slot >= 45) return;
+            Material m = clicked.getType();
+            double price = Math.max(400, Math.ceil(worth(m) * 2));
+            if (getBalance(p.getUniqueId(), "lefta") < price) { p.sendMessage(PREFIX + "Not enough Lefta. This item costs " + money(price) + "."); return; }
+            if (!p.getInventory().addItem(new ItemStack(m, 1)).isEmpty()) { p.sendMessage(PREFIX + "Inventory full."); return; }
+            changeBalance(p.getUniqueId(), "lefta", -price);
+            p.sendMessage(PREFIX + "Bought " + nice(m) + " for " + money(price) + " Lefta.");
+            return;
+        }
         if(h.type.equals("auction")) { if(clicked.hasItemMeta()&&clicked.getItemMeta().hasLore()){String line=clicked.getItemMeta().getLore().get(0);if(line.startsWith("Listing #")){auctionCommand(p,new String[]{"buy",line.substring(9)});openAuction(p);}}return; }
         if(h.type.equals("worth")) {
             String[] cats={"Ores","Mob Drops","Farming","Food","Blocks","Nether","End","All Items"};
             int index=e.getRawSlot()-10; if(index>=0&&index<cats.length) openWorthCategory(p,cats[index]); return;
+        }
+        if (h.type.equals("worth-items")) {
+            int slot = e.getRawSlot();
+            if (slot == 45) { openWorth(p); return; }
+            if (slot == 48 && h.page > 0) { openWorthCategory(p, h.category, h.page - 1); return; }
+            if (slot == 50) { openWorthCategory(p, h.category, h.page + 1); return; }
+            return;
         }
         if(h.type.equals("shop")) {
             if(e.getRawSlot()==49){openSpawnerShop(p);return;}
@@ -406,7 +462,17 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
     }
     private record Listing(UUID seller,double price,String item) {}
     private static final class MenuHolder implements InventoryHolder {
-        final String type; Inventory inv; MenuHolder(String t){type=t;} @Override public Inventory getInventory(){return inv;}
+        final String type;
+        final String category;
+        final int page;
+        Inventory inv;
+        MenuHolder(String type) { this(type, "", 0); }
+        MenuHolder(String type, String category, int page) {
+            this.type = type;
+            this.category = category;
+            this.page = page;
+        }
+        @Override public Inventory getInventory() { return inv; }
     }
 
 
