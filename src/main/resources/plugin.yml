@@ -27,6 +27,9 @@ commands:
   currency:
     description: Admin currency management.
     usage: /currency give <player> <lefta|shards> <amount>
+  banner:
+    description: Register and manage your personal banner title.
+    usage: /banner <title|rename <title>|move|remove>
 permissions:
   psiromouna.admin:
     description: Allows giving Lefta and Shards.
