@@ -1,14 +1,17 @@
 name: PsiromounaSMP
-version: 0.2.0
+version: 0.3.0
 main: com.psiromouna.smp.PsiromounaSMP
 api-version: '1.21'
 softdepend: [PlaceholderAPI]
 commands:
+  cmds:
+    description: Open the server command menu.
+    usage: /cmds
   worth:
     description: Browse item values.
     usage: /worth [search <item>|hand|<item>]
   sell:
-    description: Sell items for Lefta.
+    description: Sell items for Euros.
     usage: /sell [hand|all]
   shop:
     description: Open the item shop.
@@ -18,7 +21,7 @@ commands:
     description: Player auction house.
     usage: /ah [sell <price>|buy <id>|cancel <id>]
   balance:
-    description: View your Lefta and Shards.
+    description: View your Euros and Shards.
     aliases: [bal]
     usage: /balance
   currency:
