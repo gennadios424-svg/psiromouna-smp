@@ -19,6 +19,6 @@ jobs:
         run: gradle build
       - uses: actions/upload-artifact@v4
         with:
-          name: PsiromounaSMP-0.3.0
-          path: build/libs/PsiromounaSMP-0.3.0.jar
+          name: PsiromounaSMP-0.3.1
+          path: build/libs/PsiromounaSMP-0.3.1.jar
           if-no-files-found: error
