@@ -335,9 +335,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
     private boolean shopMatches(Material m,String c) {
         String n=m.name();
         return switch(c) {
-            case "PvP" -> Set.of("IRON_SWORD", "IRON_AXE", "IRON_PICKAXE", "IRON_SHOVEL", "IRON_HOE",
-                    "IRON_HELMET", "IRON_CHESTPLATE", "IRON_LEGGINGS", "IRON_BOOTS",
-                    "SHIELD", "BOW", "ARROW").contains(n);
+            case "PvP" -> Set.of("IRON_HELMET", "IRON_CHESTPLATE", "IRON_LEGGINGS", "IRON_BOOTS").contains(n);
             case "Blocks" -> n.contains("STONE")||n.contains("DIRT")||n.contains("LOG")||n.contains("PLANK")||n.contains("WOOL")||n.contains("GLASS")||n.contains("BRICK")||n.contains("OBSIDIAN")||n.contains("SAND");
             case "Farming" -> n.contains("SEEDS")||n.contains("WHEAT")||n.contains("CARROT")||n.contains("POTATO")||n.contains("SUGAR_CANE")||n.contains("PUMPKIN")||n.contains("MELON")||n.contains("KELP")||n.contains("PICKLE")||n.contains("PETAL");
             case "Food" -> n.contains("BREAD")||n.contains("COOKED_")||n.contains("APPLE")||n.contains("BEEF")||n.contains("PORKCHOP")||n.contains("CHICKEN")||n.contains("FISH");
