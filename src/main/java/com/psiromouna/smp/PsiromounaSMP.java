@@ -168,7 +168,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
                     List<Material> matches = Arrays.stream(Material.values()).filter(m -> !m.isAir() && worth(m) > 0 &&
                             (m.name().toLowerCase(Locale.ROOT).contains(q.replace(' ', '_')) || nice(m).toLowerCase(Locale.ROOT).contains(q))).limit(20).toList();
                     if (matches.isEmpty()) p.sendMessage(PREFIX + ChatColor.YELLOW + "No priced items found.");
-                    else { p.sendMessage(ChatColor.GOLD + "Worth search: " + q); for (Material m : matches) p.sendMessage(ChatColor.YELLOW + nice(m) + ChatColor.GRAY + " — " + ChatColor.GOLD + money(worth(m)) + " Lefta each"); }
+                    else { p.sendMessage(ChatColor.GOLD + "Worth search: " + q); for (Material m : matches) p.sendMessage(ChatColor.YELLOW + nice(m) + ChatColor.GRAY + " — " + ChatColor.GOLD + money(worth(m)) + " € each"); }
                     return true;
                 }
                 Material m = args[0].equalsIgnoreCase("hand") ? p.getInventory().getItemInMainHand().getType()
@@ -193,14 +193,14 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
                         sold += item.getAmount(); total += price * item.getAmount(); p.getInventory().setItem(i, null);
                     }
                     if (sold == 0) p.sendMessage(PREFIX + "You have no items with a sell value.");
-                    else { changeBalance(p.getUniqueId(), "lefta", total); p.sendMessage(PREFIX + ChatColor.GREEN + "Sold " + sold + " items for " + money(total) + " Lefta."); }
+                    else { changeBalance(p.getUniqueId(), "lefta", total); p.sendMessage(PREFIX + ChatColor.GREEN + "Sold " + sold + " items for " + money(total) + " €."); }
                     return true;
                 }
                 p.sendMessage(PREFIX + "Usage: /sell [hand|all]"); return true;
             }
             case "shop", "buy" -> { openShop(p); return true; }
             case "balance" -> {
-                p.sendMessage(PREFIX + ChatColor.GREEN + "Lefta: " + ChatColor.GOLD + money(getBalance(p.getUniqueId(), "lefta"))
+                p.sendMessage(PREFIX + ChatColor.GREEN + "Euros: €" + ChatColor.GOLD + money(getBalance(p.getUniqueId(), "lefta"))
                         + ChatColor.GRAY + " | Shards: " + ChatColor.AQUA + money(getBalance(p.getUniqueId(), "shards")));
                 return true;
             }
@@ -324,6 +324,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
 
         if(h.type.equals("commands")) { int slot=e.getRawSlot(); String[] cmds={"/balance","/buy","/worth","/sell","/ah"}; if(slot>=10&&slot<=14)p.performCommand(cmds[slot-10].substring(1)); return; }
         if(h.type.equals("sell")) {
+            if(e.getRawSlot()>=0&&e.getRawSlot()<45){e.setCancelled(false);return;}
             if(e.getRawSlot()==49) { double total=0; int count=0; for(int i=0;i<45;i++){ItemStack it=h.inv.getItem(i);if(it==null||it.getType().isAir())continue;double v=worth(it.getType());if(v>0){total+=v*it.getAmount();count+=it.getAmount();}}
                 if(count==0){p.sendMessage(PREFIX+"No sellable items.");return;}
                 for(int i=0;i<45;i++){ItemStack it=h.inv.getItem(i);if(it!=null&&!it.getType().isAir()&&worth(it.getType())>0)h.inv.setItem(i,null);}
@@ -408,6 +409,22 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         final String type; Inventory inv; MenuHolder(String t){type=t;} @Override public Inventory getInventory(){return inv;}
     }
 
+
+    @EventHandler public void onSellClose(org.bukkit.event.inventory.InventoryCloseEvent e) {
+        if (!(e.getPlayer() instanceof Player)) return;
+        Player p=(Player)e.getPlayer();
+        if (!(e.getInventory().getHolder() instanceof MenuHolder)) return;
+        MenuHolder h=(MenuHolder)e.getInventory().getHolder();
+        if (!h.type.equals("sell")) return;
+        for(int i=0;i<45;i++) {
+            ItemStack it=e.getInventory().getItem(i);
+            if(it!=null&&!it.getType().isAir()) {
+                Map<Integer,ItemStack> left=p.getInventory().addItem(it);
+                for(ItemStack drop:left.values()) p.getWorld().dropItemNaturally(p.getLocation(),drop);
+            }
+        }
+    }
+
     @EventHandler public void onJoin(org.bukkit.event.player.PlayerJoinEvent e) {
         Player p=e.getPlayer();
         e.setJoinMessage(ChatColor.DARK_AQUA+"✦ "+ChatColor.AQUA+p.getName()+ChatColor.GRAY+" joined Psiromouna SMP");
@@ -418,7 +435,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
     private void updateDisplays(Player p) {
         double lefta=getBalance(p.getUniqueId(),"lefta"), shards=getBalance(p.getUniqueId(),"shards");
         p.setPlayerListHeaderFooter(ChatColor.DARK_AQUA+"✦ PSIROMOUNA SMP ✦\n"+ChatColor.GRAY+"Survive • Trade • Build",
-                ChatColor.GOLD+"Lefta: "+money(lefta)+"   "+ChatColor.AQUA+"Shards: "+money(shards)+"\n"+ChatColor.GRAY+"Players: "+Bukkit.getOnlinePlayers().size()+"/"+Bukkit.getMaxPlayers());
+                ChatColor.GOLD+"€ "+money(lefta)+"   "+ChatColor.AQUA+"Shards: "+money(shards)+"\n"+ChatColor.GRAY+"Players: "+Bukkit.getOnlinePlayers().size()+"/"+Bukkit.getMaxPlayers());
         Scoreboard board=Bukkit.getScoreboardManager().getNewScoreboard();
         Objective obj=board.registerNewObjective("smpinfo",Criteria.DUMMY,ChatColor.AQUA+""+ChatColor.BOLD+"PSIROMOUNA");
         obj.setDisplaySlot(DisplaySlot.SIDEBAR);
