@@ -74,6 +74,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         saveDefaultConfig();
         openDatabase();
         loadLoadedBannerTitles();
+        Bukkit.getScheduler().runTaskTimer(this, this::updateBannerTitleVisibility, 20L, 10L);
         getServer().getPluginManager().registerEvents(this, this);
         if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) new EconomyExpansion(this).register();
         for (String name : List.of("worth", "sell", "shop", "buy", "ah", "balance", "currency", "cmds", "banner", "afk")) {
@@ -335,6 +336,32 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
             }
         } catch (SQLException ex) { getLogger().warning("Could not refresh banner: " + ex.getMessage()); }
     }
+    private void updateBannerTitleVisibility() {
+        try (Statement st = db.createStatement();
+             ResultSet rs = st.executeQuery("SELECT world,x,y,z,display_uuid FROM player_banners WHERE display_uuid IS NOT NULL")) {
+            while (rs.next()) {
+                org.bukkit.World world = Bukkit.getWorld(rs.getString("world"));
+                if (world == null) continue;
+                org.bukkit.entity.Entity entity;
+                try { entity = world.getEntity(UUID.fromString(rs.getString("display_uuid"))); }
+                catch (IllegalArgumentException ex) { continue; }
+                if (!(entity instanceof TextDisplay display)) continue;
+                org.bukkit.Location bannerLocation = new org.bukkit.Location(world,
+                    rs.getInt("x") + 0.5, rs.getInt("y") + 0.5, rs.getInt("z") + 0.5);
+                for (Player viewer : Bukkit.getOnlinePlayers()) {
+                    if (!viewer.getWorld().equals(world)) continue;
+                    if (viewer.getLocation().distanceSquared(bannerLocation) <= 100.0) {
+                        viewer.hideEntity(this, display);
+                    } else {
+                        viewer.showEntity(this, display);
+                    }
+                }
+            }
+        } catch (SQLException ex) {
+            getLogger().warning("Could not update banner title visibility: " + ex.getMessage());
+        }
+    }
+
     private void spawnPlayerBanner(UUID owner) {
         try (PreparedStatement ps = db.prepareStatement("SELECT world,x,y,z,title,display_uuid FROM player_banners WHERE owner=?")) {
             ps.setString(1, owner.toString());
@@ -349,6 +376,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
                 org.bukkit.entity.Entity old = oldId == null ? null : world.getEntity(oldId);
                 if (old instanceof TextDisplay existing) {
                     existing.teleport(new org.bukkit.Location(world, x + 0.5, y + 20.0, z + 0.5));
+                    existing.setVisibleByDefault(false);
                     existing.setViewRange(128.0f);
                     existing.setLineWidth(240);
                     existing.setText(ChatColor.LIGHT_PURPLE.toString() + ChatColor.BOLD + rs.getString("title"));
@@ -359,6 +387,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
                     entity.setText(ChatColor.LIGHT_PURPLE.toString() + ChatColor.BOLD + title);
                     entity.setBillboard(Display.Billboard.CENTER);
                     entity.setAlignment(TextDisplay.TextAlignment.CENTER);
+                    entity.setVisibleByDefault(false);
                     entity.setViewRange(128.0f);
                     entity.setLineWidth(240);
                     entity.setShadowed(true);
