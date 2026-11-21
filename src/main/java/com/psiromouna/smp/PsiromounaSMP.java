@@ -7,6 +7,8 @@ import org.bukkit.OfflinePlayer;
 import org.bukkit.command.*;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.TextDisplay;
+import org.bukkit.entity.Display;
 import org.bukkit.event.*;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.inventory.*;
@@ -70,7 +72,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         openDatabase();
         getServer().getPluginManager().registerEvents(this, this);
         if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) new EconomyExpansion(this).register();
-        for (String name : List.of("worth", "sell", "shop", "buy", "ah", "balance", "currency", "cmds")) {
+        for (String name : List.of("worth", "sell", "shop", "buy", "ah", "balance", "currency", "cmds", "banner")) {
             PluginCommand cmd = getCommand(name);
             if (cmd != null) cmd.setTabCompleter(this);
         }
@@ -98,6 +100,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
             try (Statement s = db.createStatement()) {
                 s.executeUpdate("CREATE TABLE IF NOT EXISTS balances (uuid TEXT PRIMARY KEY, lefta REAL NOT NULL DEFAULT 0, shards REAL NOT NULL DEFAULT 0)");
                 s.executeUpdate("CREATE TABLE IF NOT EXISTS auctions (id INTEGER PRIMARY KEY AUTOINCREMENT, seller TEXT NOT NULL, seller_name TEXT NOT NULL, price REAL NOT NULL, item TEXT NOT NULL)");
+                s.executeUpdate("CREATE TABLE IF NOT EXISTS player_banners (owner TEXT PRIMARY KEY, world TEXT NOT NULL, x INTEGER NOT NULL, y INTEGER NOT NULL, z INTEGER NOT NULL, title TEXT NOT NULL, display_uuid TEXT)");
             }
         } catch (Exception e) {
             getLogger().severe("Could not open economy database: " + e.getMessage());
@@ -159,6 +162,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
     @Override public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         String name = command.getName().toLowerCase(Locale.ROOT);
         if (name.equals("currency")) return currencyCommand(sender, args);
+        if (name.equals("banner")) { if (!(sender instanceof Player bp)) { sender.sendMessage("Players only."); return true; } return bannerCommand(bp, args); }
         if (!(sender instanceof Player p)) { sender.sendMessage("Players only."); return true; }
 
         switch (name) {
@@ -210,6 +214,164 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
             case "ah" -> { if (args.length == 0) { openAuction(p); return true; } return auctionCommand(p, args); }
         }
         return false;
+    }
+
+    private boolean bannerCommand(Player p, String[] args) {
+        if (args.length == 0) {
+            p.sendMessage(ChatColor.LIGHT_PURPLE + "Banner commands:");
+            p.sendMessage(ChatColor.WHITE + "/banner <title> " + ChatColor.GRAY + "- register the banner you're looking at");
+            p.sendMessage(ChatColor.WHITE + "/banner rename <title> " + ChatColor.GRAY + "- change your title");
+            p.sendMessage(ChatColor.WHITE + "/banner move " + ChatColor.GRAY + "- move your title to another banner");
+            p.sendMessage(ChatColor.WHITE + "/banner remove " + ChatColor.GRAY + "- remove your banner and title");
+            return true;
+        }
+        String action = args[0].toLowerCase(Locale.ROOT);
+        if (action.equals("remove")) {
+            if (!removePlayerBanner(p.getUniqueId())) { p.sendMessage(PREFIX + ChatColor.RED + "You don't have a registered banner."); return true; }
+            p.sendMessage(PREFIX + ChatColor.GREEN + "Your banner and floating title were removed.");
+            return true;
+        }
+        if (action.equals("rename")) {
+            if (args.length < 2) { p.sendMessage(PREFIX + "Usage: /banner rename <title>"); return true; }
+            String title = cleanBannerTitle(String.join(" ", Arrays.copyOfRange(args, 1, args.length)));
+            if (title.isBlank()) { p.sendMessage(PREFIX + ChatColor.RED + "Enter a title."); return true; }
+            try (PreparedStatement ps = db.prepareStatement("UPDATE player_banners SET title=? WHERE owner=?")) {
+                ps.setString(1, title); ps.setString(2, p.getUniqueId().toString());
+                if (ps.executeUpdate() == 0) { p.sendMessage(PREFIX + ChatColor.RED + "Register a banner first with /banner <title>."); return true; }
+                refreshPlayerBanner(p.getUniqueId());
+                p.sendMessage(PREFIX + ChatColor.GREEN + "Banner title changed to " + ChatColor.LIGHT_PURPLE + title);
+            } catch (SQLException ex) { p.sendMessage(PREFIX + ChatColor.RED + "Could not update your banner."); }
+            return true;
+        }
+        boolean moving = action.equals("move");
+        String title;
+        if (moving) {
+            title = getPlayerBannerTitle(p.getUniqueId());
+            if (title == null) { p.sendMessage(PREFIX + ChatColor.RED + "You don't have a banner yet. Use /banner <title> first."); return true; }
+        } else {
+            title = cleanBannerTitle(String.join(" ", args));
+            if (title.isBlank()) { p.sendMessage(PREFIX + ChatColor.RED + "Enter a title."); return true; }
+        }
+        org.bukkit.block.Block target = p.getTargetBlockExact(6);
+        if (target == null || !(target.getState() instanceof org.bukkit.block.Banner)) {
+            p.sendMessage(PREFIX + ChatColor.RED + "Look directly at a placed banner within 6 blocks.");
+            return true;
+        }
+        if (!moving && hasPlayerBanner(p.getUniqueId())) {
+            p.sendMessage(PREFIX + ChatColor.RED + "You already have a banner. Use /banner rename <title> or /banner move.");
+            return true;
+        }
+        if (isBannerOwnedByOther(target, p.getUniqueId())) {
+            p.sendMessage(PREFIX + ChatColor.RED + "That banner is already registered to another player.");
+            return true;
+        }
+        if (moving) removePlayerBanner(p.getUniqueId());
+        try (PreparedStatement ps = db.prepareStatement("INSERT OR REPLACE INTO player_banners(owner,world,x,y,z,title,display_uuid) VALUES(?,?,?,?,?,?,NULL)")) {
+            ps.setString(1, p.getUniqueId().toString()); ps.setString(2, target.getWorld().getName());
+            ps.setInt(3, target.getX()); ps.setInt(4, target.getY()); ps.setInt(5, target.getZ()); ps.setString(6, title);
+            ps.executeUpdate();
+            spawnPlayerBanner(p.getUniqueId());
+            p.sendMessage(PREFIX + ChatColor.GREEN + (moving ? "Banner moved." : "Banner registered!") + " Floating title: " + ChatColor.LIGHT_PURPLE + title);
+        } catch (SQLException ex) { p.sendMessage(PREFIX + ChatColor.RED + "Could not save your banner."); }
+        return true;
+    }
+
+    private String cleanBannerTitle(String raw) {
+        String cleaned = ChatColor.stripColor(raw).replaceAll("[\\r\\n\\t]", " ").trim();
+        return cleaned.length() > 48 ? cleaned.substring(0, 48) : cleaned;
+    }
+    private boolean hasPlayerBanner(UUID owner) { return getPlayerBannerTitle(owner) != null; }
+    private String getPlayerBannerTitle(UUID owner) {
+        try (PreparedStatement ps = db.prepareStatement("SELECT title FROM player_banners WHERE owner=?")) {
+            ps.setString(1, owner.toString()); try (ResultSet rs = ps.executeQuery()) { return rs.next() ? rs.getString(1) : null; }
+        } catch (SQLException ex) { return null; }
+    }
+    private boolean isBannerOwnedByOther(org.bukkit.block.Block block, UUID owner) {
+        try (PreparedStatement ps = db.prepareStatement("SELECT owner FROM player_banners WHERE world=? AND x=? AND y=? AND z=?")) {
+            ps.setString(1, block.getWorld().getName()); ps.setInt(2, block.getX()); ps.setInt(3, block.getY()); ps.setInt(4, block.getZ());
+            try (ResultSet rs = ps.executeQuery()) { return rs.next() && !rs.getString(1).equals(owner.toString()); }
+        } catch (SQLException ex) { return true; }
+    }
+    private boolean removePlayerBanner(UUID owner) {
+        try (PreparedStatement ps = db.prepareStatement("SELECT world,display_uuid FROM player_banners WHERE owner=?")) {
+            ps.setString(1, owner.toString());
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) return false;
+                org.bukkit.World world = Bukkit.getWorld(rs.getString("world"));
+                if (world != null && rs.getString("display_uuid") != null) {
+                    try { org.bukkit.entity.Entity entity = world.getEntity(UUID.fromString(rs.getString("display_uuid"))); if (entity != null) entity.remove(); } catch (IllegalArgumentException ignored) {}
+                }
+            }
+            try (PreparedStatement del = db.prepareStatement("DELETE FROM player_banners WHERE owner=?")) { del.setString(1, owner.toString()); del.executeUpdate(); }
+            return true;
+        } catch (SQLException ex) { return false; }
+    }
+    private void refreshPlayerBanner(UUID owner) {
+        try (PreparedStatement ps = db.prepareStatement("SELECT world,title,display_uuid FROM player_banners WHERE owner=?")) {
+            ps.setString(1, owner.toString());
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) return;
+                org.bukkit.World world = Bukkit.getWorld(rs.getString("world"));
+                if (world == null) return;
+                UUID displayId = null;
+                try { if (rs.getString("display_uuid") != null) displayId = UUID.fromString(rs.getString("display_uuid")); } catch (IllegalArgumentException ignored) {}
+                org.bukkit.entity.Entity entity = displayId == null ? null : world.getEntity(displayId);
+                if (entity instanceof TextDisplay display) display.setText(ChatColor.LIGHT_PURPLE.toString() + ChatColor.BOLD + rs.getString("title"));
+                else spawnPlayerBanner(owner);
+            }
+        } catch (SQLException ex) { getLogger().warning("Could not refresh banner: " + ex.getMessage()); }
+    }
+    private void spawnPlayerBanner(UUID owner) {
+        try (PreparedStatement ps = db.prepareStatement("SELECT world,x,y,z,title,display_uuid FROM player_banners WHERE owner=?")) {
+            ps.setString(1, owner.toString());
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) return;
+                org.bukkit.World world = Bukkit.getWorld(rs.getString("world"));
+                if (world == null) return;
+                int x = rs.getInt("x"), y = rs.getInt("y"), z = rs.getInt("z");
+                if (!world.isChunkLoaded(x >> 4, z >> 4)) return;
+                UUID oldId = null;
+                try { if (rs.getString("display_uuid") != null) oldId = UUID.fromString(rs.getString("display_uuid")); } catch (IllegalArgumentException ignored) {}
+                org.bukkit.entity.Entity old = oldId == null ? null : world.getEntity(oldId);
+                if (old instanceof TextDisplay existing) {
+                    existing.teleport(new org.bukkit.Location(world, x + 0.5, y + 1.65, z + 0.5));
+                    existing.setText(ChatColor.LIGHT_PURPLE.toString() + ChatColor.BOLD + rs.getString("title"));
+                    return;
+                }
+                String title = rs.getString("title");
+                TextDisplay display = world.spawn(new org.bukkit.Location(world, x + 0.5, y + 1.65, z + 0.5), TextDisplay.class, entity -> {
+                    entity.setText(ChatColor.LIGHT_PURPLE.toString() + ChatColor.BOLD + title);
+                    entity.setBillboard(Display.Billboard.CENTER);
+                    entity.setAlignment(TextDisplay.TextAlignment.CENTER);
+                    entity.setShadowed(true);
+                    entity.setSeeThrough(false);
+                    entity.setDefaultBackground(false);
+                    entity.setPersistent(true);
+                    entity.setInvulnerable(true);
+                });
+                try (PreparedStatement update = db.prepareStatement("UPDATE player_banners SET display_uuid=? WHERE owner=?")) {
+                    update.setString(1, display.getUniqueId().toString()); update.setString(2, owner.toString()); update.executeUpdate();
+                }
+            }
+        } catch (Exception ex) { getLogger().warning("Could not spawn banner title: " + ex.getMessage()); }
+    }
+    @EventHandler public void onBannerChunkLoad(org.bukkit.event.world.ChunkLoadEvent e) {
+        try (PreparedStatement ps = db.prepareStatement("SELECT owner FROM player_banners WHERE world=? AND (x >> 4)=? AND (z >> 4)=?")) {
+            ps.setString(1, e.getWorld().getName()); ps.setInt(2, e.getChunk().getX()); ps.setInt(3, e.getChunk().getZ());
+            try (ResultSet rs = ps.executeQuery()) { while (rs.next()) spawnPlayerBanner(UUID.fromString(rs.getString(1))); }
+        } catch (SQLException ex) { getLogger().warning("Could not load banner titles: " + ex.getMessage()); }
+    }
+    @EventHandler public void onBannerBreak(org.bukkit.event.block.BlockBreakEvent e) {
+        org.bukkit.block.Block block = e.getBlock();
+        try (PreparedStatement ps = db.prepareStatement("SELECT owner FROM player_banners WHERE world=? AND x=? AND y=? AND z=?")) {
+            ps.setString(1, block.getWorld().getName()); ps.setInt(2, block.getX()); ps.setInt(3, block.getY()); ps.setInt(4, block.getZ());
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) return;
+                UUID owner = UUID.fromString(rs.getString("owner"));
+                if (!owner.equals(e.getPlayer().getUniqueId())) { e.setCancelled(true); e.getPlayer().sendMessage(PREFIX + ChatColor.RED + "That is someone else's registered banner."); return; }
+                removePlayerBanner(owner);
+            }
+        } catch (SQLException ex) { getLogger().warning("Could not clean up broken banner: " + ex.getMessage()); }
     }
 
     private void sellStack(Player p, ItemStack item, int amount) {
@@ -496,7 +658,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
             Material m=clicked.getType(); double price=Math.max(1,worth(m)*2);
             if(getBalance(p.getUniqueId(),"lefta")<price){p.sendMessage(PREFIX+ChatColor.RED+"Not enough Lefta.");return;}
             if(!p.getInventory().addItem(new ItemStack(m,1)).isEmpty()){p.sendMessage(PREFIX+"Your inventory is full.");return;}
-            changeBalance(p.getUniqueId(),"lefta",-price); p.sendMessage(PREFIX+ChatColor.GREEN+"Bought "+nice(m)+" for €"+money(price)+".); return;
+            changeBalance(p.getUniqueId(),"lefta",-price); p.sendMessage(PREFIX+ChatColor.GREEN+"Bought "+nice(m)+" for €"+money(price)+"."); return;
         }
         if(h.type.equals("spawners")&&e.getRawSlot()==13){
             if(getBalance(p.getUniqueId(),"shards")<25){p.sendMessage(PREFIX+ChatColor.RED+"Not enough Shards.");return;}
@@ -518,7 +680,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
                 String encoded=encodeItem(hand); try(PreparedStatement ps=db.prepareStatement("INSERT INTO auctions(seller,seller_name,price,item) VALUES(?,?,?,?)")) {
                     ps.setString(1,p.getUniqueId().toString());ps.setString(2,p.getName());ps.setDouble(3,price);ps.setString(4,encoded);ps.executeUpdate();
                 }
-                p.getInventory().setItemInMainHand(null);p.sendMessage(PREFIX+ChatColor.GREEN+"Listed item for €"+money(price)+".);
+                p.getInventory().setItemInMainHand(null);p.sendMessage(PREFIX+ChatColor.GREEN+"Listed item for €"+money(price)+".");
             } catch(Exception ex){p.sendMessage(PREFIX+ChatColor.RED+"Invalid price or listing error.");}
             return true;
         }
@@ -630,6 +792,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
                 case "sell" -> List.of("hand","all");
                 case "ah" -> List.of("sell","buy","cancel","help");
                 case "currency" -> List.of("give");
+                case "banner" -> List.of("rename", "move", "remove");
                 default -> List.of();
             };
             return opts.stream().filter(s->s.startsWith(args[0].toLowerCase(Locale.ROOT))).toList();
