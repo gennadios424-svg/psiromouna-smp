@@ -30,6 +30,9 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
     private BukkitTask displayTask;
     private final Map<Integer, Listing> listings = new LinkedHashMap<>();
     private final Map<UUID, Long> lastDisplay = new HashMap<>();
+    private final Map<UUID, Long> pvpTaggedUntil = new HashMap<>();
+    private final Set<UUID> afkPlayers = new HashSet<>();
+    private static final long PVP_TAG_MILLIS = 15_000L;
     private static final String PREFIX = ChatColor.DARK_AQUA + "[SMP] " + ChatColor.RESET;
     private static final Map<Material, Double> DEFAULT_PRICES = new LinkedHashMap<>();
 
@@ -73,7 +76,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         loadLoadedBannerTitles();
         getServer().getPluginManager().registerEvents(this, this);
         if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) new EconomyExpansion(this).register();
-        for (String name : List.of("worth", "sell", "shop", "buy", "ah", "balance", "currency", "cmds", "banner")) {
+        for (String name : List.of("worth", "sell", "shop", "buy", "ah", "balance", "currency", "cmds", "banner", "afk")) {
             PluginCommand cmd = getCommand(name);
             if (cmd != null) cmd.setTabCompleter(this);
         }
@@ -164,6 +167,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         String name = command.getName().toLowerCase(Locale.ROOT);
         if (name.equals("currency")) return currencyCommand(sender, args);
         if (name.equals("banner")) { if (!(sender instanceof Player bp)) { sender.sendMessage("Players only."); return true; } return bannerCommand(bp, args); }
+        if (name.equals("afk")) { if (!(sender instanceof Player ap)) { sender.sendMessage("Players only."); return true; } return afkCommand(ap); }
         if (!(sender instanceof Player p)) { sender.sendMessage("Players only."); return true; }
 
         switch (name) {
@@ -344,15 +348,19 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
                 try { if (rs.getString("display_uuid") != null) oldId = UUID.fromString(rs.getString("display_uuid")); } catch (IllegalArgumentException ignored) {}
                 org.bukkit.entity.Entity old = oldId == null ? null : world.getEntity(oldId);
                 if (old instanceof TextDisplay existing) {
-                    existing.teleport(new org.bukkit.Location(world, x + 0.5, y + 1.65, z + 0.5));
+                    existing.teleport(new org.bukkit.Location(world, x + 0.5, y + 20.0, z + 0.5));
+                    existing.setViewRange(128.0f);
+                    existing.setLineWidth(240);
                     existing.setText(ChatColor.LIGHT_PURPLE.toString() + ChatColor.BOLD + rs.getString("title"));
                     return;
                 }
                 String title = rs.getString("title");
-                TextDisplay display = world.spawn(new org.bukkit.Location(world, x + 0.5, y + 1.65, z + 0.5), TextDisplay.class, entity -> {
+                TextDisplay display = world.spawn(new org.bukkit.Location(world, x + 0.5, y + 20.0, z + 0.5), TextDisplay.class, entity -> {
                     entity.setText(ChatColor.LIGHT_PURPLE.toString() + ChatColor.BOLD + title);
                     entity.setBillboard(Display.Billboard.CENTER);
                     entity.setAlignment(TextDisplay.TextAlignment.CENTER);
+                    entity.setViewRange(128.0f);
+                    entity.setLineWidth(240);
                     entity.setShadowed(true);
                     entity.setSeeThrough(false);
                     entity.setDefaultBackground(false);
@@ -761,12 +769,130 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         }
     }
 
+    private boolean afkCommand(Player p) {
+        UUID id = p.getUniqueId();
+        if (afkPlayers.remove(id)) {
+            p.setInvulnerable(false);
+            p.setWalkSpeed(0.2f);
+            p.setFlySpeed(0.1f);
+            p.sendMessage(PREFIX + ChatColor.GREEN + "You are no longer AFK.");
+        } else {
+            afkPlayers.add(id);
+            p.setInvulnerable(true);
+            p.setVelocity(new org.bukkit.util.Vector(0, 0, 0));
+            p.sendMessage(PREFIX + ChatColor.YELLOW + "You are now AFK. You are protected and frozen until you use /afk again.");
+        }
+        return true;
+    }
+
+    private boolean isPvpTagged(Player p) {
+        Long until = pvpTaggedUntil.get(p.getUniqueId());
+        if (until == null) return false;
+        if (until <= System.currentTimeMillis()) { pvpTaggedUntil.remove(p.getUniqueId()); return false; }
+        return true;
+    }
+    private void tagForPvp(Player p) {
+        if (afkPlayers.contains(p.getUniqueId())) return;
+        pvpTaggedUntil.put(p.getUniqueId(), System.currentTimeMillis() + PVP_TAG_MILLIS);
+        p.sendActionBar(ChatColor.RED + "⚔ PVP TAG " + ChatColor.GRAY + "— 15 seconds");
+    }
+    private boolean isAllowedShopCommand(String message) {
+        String cmd = message.toLowerCase(Locale.ROOT).split("\\s+", 2)[0];
+        return cmd.equals("/shop") || cmd.equals("/buy") || cmd.equals("/psiromounasmp:shop") || cmd.equals("/psiromounasmp:buy");
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onPvpTagDamage(org.bukkit.event.entity.EntityDamageByEntityEvent e) {
+        if (!(e.getEntity() instanceof Player victim)) return;
+        Player attacker = null;
+        if (e.getDamager() instanceof Player direct) attacker = direct;
+        else if (e.getDamager() instanceof org.bukkit.entity.Projectile projectile && projectile.getShooter() instanceof Player shooter) attacker = shooter;
+        if (attacker == null || attacker.equals(victim)) return;
+        if (afkPlayers.contains(victim.getUniqueId()) || afkPlayers.contains(attacker.getUniqueId())) { e.setCancelled(true); return; }
+        tagForPvp(victim);
+        tagForPvp(attacker);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onTaggedCommands(org.bukkit.event.player.PlayerCommandPreprocessEvent e) {
+        Player p = e.getPlayer();
+        if (afkPlayers.contains(p.getUniqueId())) {
+            if (!e.getMessage().equalsIgnoreCase("/afk")) { e.setCancelled(true); p.sendMessage(PREFIX + ChatColor.RED + "You are AFK. Use /afk to return."); }
+            return;
+        }
+        if (isPvpTagged(p) && !isAllowedShopCommand(e.getMessage())) {
+            e.setCancelled(true);
+            p.sendMessage(PREFIX + ChatColor.RED + "You are combat-tagged. Only /shop and /buy are available for 15 seconds after PvP.");
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onAfkDamage(org.bukkit.event.entity.EntityDamageEvent e) {
+        if (e.getEntity() instanceof Player p && afkPlayers.contains(p.getUniqueId())) e.setCancelled(true);
+    }
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onAfkMove(org.bukkit.event.player.PlayerMoveEvent e) {
+        if (afkPlayers.contains(e.getPlayer().getUniqueId()) && e.getTo() != null &&
+                (e.getFrom().getX() != e.getTo().getX() || e.getFrom().getY() != e.getTo().getY() || e.getFrom().getZ() != e.getTo().getZ())) {
+            e.setTo(e.getFrom());
+        }
+    }
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onAfkVelocity(org.bukkit.event.player.PlayerVelocityEvent e) {
+        if (afkPlayers.contains(e.getPlayer().getUniqueId())) e.setCancelled(true);
+    }
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onAfkTeleport(org.bukkit.event.player.PlayerTeleportEvent e) {
+        if (afkPlayers.contains(e.getPlayer().getUniqueId())) e.setCancelled(true);
+    }
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onAfkInteract(org.bukkit.event.player.PlayerInteractEvent e) {
+        if (afkPlayers.contains(e.getPlayer().getUniqueId())) e.setCancelled(true);
+    }
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onAfkDrop(org.bukkit.event.player.PlayerDropItemEvent e) {
+        if (afkPlayers.contains(e.getPlayer().getUniqueId())) e.setCancelled(true);
+    }
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onAfkBreak(org.bukkit.event.block.BlockBreakEvent e) {
+        if (afkPlayers.contains(e.getPlayer().getUniqueId())) e.setCancelled(true);
+    }
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onAfkPlace(org.bukkit.event.block.BlockPlaceEvent e) {
+        if (afkPlayers.contains(e.getPlayer().getUniqueId())) e.setCancelled(true);
+    }
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onAfkInventory(InventoryClickEvent e) {
+        if (e.getWhoClicked() instanceof Player p && afkPlayers.contains(p.getUniqueId())) e.setCancelled(true);
+    }
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onPvpTaggedInventory(InventoryClickEvent e) {
+        if (!(e.getWhoClicked() instanceof Player p) || !isPvpTagged(p)) return;
+        if (!(e.getView().getTopInventory().getHolder() instanceof MenuHolder holder) ||
+                !(holder.type.equals("shop-categories") || holder.type.equals("shop-items") || holder.type.equals("spawners"))) e.setCancelled(true);
+    }
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onPvpTaggedInventoryDrag(org.bukkit.event.inventory.InventoryDragEvent e) {
+        if (!(e.getWhoClicked() instanceof Player p) || !isPvpTagged(p)) return;
+        if (!(e.getView().getTopInventory().getHolder() instanceof MenuHolder holder) ||
+                !(holder.type.equals("shop-categories") || holder.type.equals("shop-items") || holder.type.equals("spawners"))) e.setCancelled(true);
+    }
+
+    private void onQuitCleanup(Player p) {
+        afkPlayers.remove(p.getUniqueId());
+        pvpTaggedUntil.remove(p.getUniqueId());
+        p.setInvulnerable(false);
+    }
+
     @EventHandler public void onJoin(org.bukkit.event.player.PlayerJoinEvent e) {
         Player p=e.getPlayer();
+        p.setInvulnerable(false);
         e.setJoinMessage(ChatColor.DARK_AQUA+"✦ "+ChatColor.AQUA+p.getName()+ChatColor.GRAY+" joined Psiromouna SMP");
         p.sendTitle(ChatColor.AQUA+""+ChatColor.BOLD+"WELCOME TO",ChatColor.WHITE+"PSIROMOUNA SMP",10,80,20);
         updateDisplays(p);
     }
+
+    @EventHandler public void onQuit(org.bukkit.event.player.PlayerQuitEvent e) { onQuitCleanup(e.getPlayer()); }
 
     private void updateDisplays(Player p) {
         double lefta=getBalance(p.getUniqueId(),"lefta"), shards=getBalance(p.getUniqueId(),"shards");
@@ -803,6 +929,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
                 case "ah" -> List.of("sell","buy","cancel","help");
                 case "currency" -> List.of("give");
                 case "banner" -> List.of("rename", "move", "remove");
+                case "afk" -> List.of();
                 default -> List.of();
             };
             return opts.stream().filter(s->s.startsWith(args[0].toLowerCase(Locale.ROOT))).toList();
