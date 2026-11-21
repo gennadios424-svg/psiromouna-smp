@@ -236,7 +236,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         }
         String action = args[0].toLowerCase(Locale.ROOT);
         if (action.equals("remove")) {
-            if (!removePlayerBanner(p.getUniqueId())) { p.sendMessage(PREFIX + ChatColor.RED + "You don't have a registered banner."); return true; }
+            if (!removePlayerBanner(p.getUniqueId(), true)) { p.sendMessage(PREFIX + ChatColor.RED + "You don't have a registered banner."); return true; }
             p.sendMessage(PREFIX + ChatColor.GREEN + "Your banner and floating title were removed.");
             return true;
         }
@@ -274,7 +274,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
             p.sendMessage(PREFIX + ChatColor.RED + "That banner is already registered to another player.");
             return true;
         }
-        if (moving) removePlayerBanner(p.getUniqueId());
+        if (moving) removePlayerBanner(p.getUniqueId(), false);
         try (PreparedStatement ps = db.prepareStatement("INSERT OR REPLACE INTO player_banners(owner,world,x,y,z,title,display_uuid) VALUES(?,?,?,?,?,?,NULL)")) {
             ps.setString(1, p.getUniqueId().toString()); ps.setString(2, target.getWorld().getName());
             ps.setInt(3, target.getX()); ps.setInt(4, target.getY()); ps.setInt(5, target.getZ()); ps.setString(6, title);
@@ -301,12 +301,13 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
             try (ResultSet rs = ps.executeQuery()) { return rs.next() && !rs.getString(1).equals(owner.toString()); }
         } catch (SQLException ex) { return true; }
     }
-    private boolean removePlayerBanner(UUID owner) {
-        try (PreparedStatement ps = db.prepareStatement("SELECT world,display_uuid FROM player_banners WHERE owner=?")) {
+    private boolean removePlayerBanner(UUID owner, boolean removeBlock) {
+        try (PreparedStatement ps = db.prepareStatement("SELECT world,x,y,z,display_uuid FROM player_banners WHERE owner=?")) {
             ps.setString(1, owner.toString());
             try (ResultSet rs = ps.executeQuery()) {
                 if (!rs.next()) return false;
                 org.bukkit.World world = Bukkit.getWorld(rs.getString("world"));
+                if (removeBlock && world != null) { org.bukkit.block.Block bannerBlock = world.getBlockAt(rs.getInt("x"), rs.getInt("y"), rs.getInt("z")); if (bannerBlock.getState() instanceof org.bukkit.block.Banner) bannerBlock.setType(Material.AIR, false); }
                 if (world != null && rs.getString("display_uuid") != null) {
                     try { org.bukkit.entity.Entity entity = world.getEntity(UUID.fromString(rs.getString("display_uuid"))); if (entity != null) entity.remove(); } catch (IllegalArgumentException ignored) {}
                 }
@@ -378,7 +379,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
                 if (!rs.next()) return;
                 UUID owner = UUID.fromString(rs.getString("owner"));
                 if (!owner.equals(e.getPlayer().getUniqueId())) { e.setCancelled(true); e.getPlayer().sendMessage(PREFIX + ChatColor.RED + "That is someone else's registered banner."); return; }
-                removePlayerBanner(owner);
+                removePlayerBanner(owner, false);
             }
         } catch (SQLException ex) { getLogger().warning("Could not clean up broken banner: " + ex.getMessage()); }
     }
