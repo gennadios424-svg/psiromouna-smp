@@ -467,6 +467,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         inv.setItem(12,button(Material.BOOK,ChatColor.AQUA+"/worth","Search item values"));
         inv.setItem(13,button(Material.HOPPER,ChatColor.GREEN+"/sell","Open sell chest"));
         inv.setItem(14,button(Material.CHEST,ChatColor.LIGHT_PURPLE+"/ah","Auction house"));
+        inv.setItem(15,button(Material.WHITE_BANNER,ChatColor.LIGHT_PURPLE+"/banner","Create and manage your floating banner title"));
         p.openInventory(inv);
     }
     private void openSell(Player p) {
@@ -634,7 +635,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         if(e.getRawSlot()<0||e.getRawSlot()>=e.getInventory().getSize()) return;
         ItemStack clicked=e.getCurrentItem(); if(clicked==null||clicked.getType().isAir()) return;
 
-        if(h.type.equals("commands")) { int slot=e.getRawSlot(); String[] cmds={"/balance","/buy","/worth","/sell","/ah"}; if(slot>=10&&slot<=14)p.performCommand(cmds[slot-10].substring(1)); return; }
+        if(h.type.equals("commands")) { int slot=e.getRawSlot(); String[] cmds={"/balance","/buy","/worth","/sell","/ah","/banner"}; if(slot>=10&&slot<=15)p.performCommand(cmds[slot-10].substring(1)); return; }
         if(h.type.equals("shop-categories")) { String[] cats={"PvP","Blocks","Farming","Spawners","Food","Redstone"};int ix=e.getRawSlot()-10;if(ix>=0&&ix<6){if(ix==3)openSpawnerShop(p);else openShopCategory(p,cats[ix]);}return; }
         if(h.type.equals("shop-items")) {
             int slot = e.getRawSlot();
