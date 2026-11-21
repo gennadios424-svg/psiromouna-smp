@@ -789,7 +789,6 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         for (String line : lines) {
             org.bukkit.scoreboard.Score entry = obj.getScore(line);
             entry.setScore(score--);
-            entry.setNumberFormat(org.bukkit.scoreboard.NumberFormat.blank());
         }
         p.setScoreboard(board);
     }
