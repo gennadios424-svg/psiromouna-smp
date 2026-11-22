@@ -191,18 +191,14 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         "PUMPKIN",
         "MELON"
     );
-    private static final Set<String> PVP_ITEMS = Set.of(
-        "WOODEN_SWORD", "STONE_SWORD", "IRON_SWORD", "GOLDEN_SWORD", "DIAMOND_SWORD", "NETHERITE_SWORD",
-        "WOODEN_AXE", "STONE_AXE", "IRON_AXE", "GOLDEN_AXE", "DIAMOND_AXE", "NETHERITE_AXE",
-        "SHIELD", "BOW", "CROSSBOW", "TRIDENT", "MACE",
+    private static final Set<String> ARMOUR_ITEMS = Set.of(
         "LEATHER_HELMET", "LEATHER_CHESTPLATE", "LEATHER_LEGGINGS", "LEATHER_BOOTS",
         "CHAINMAIL_HELMET", "CHAINMAIL_CHESTPLATE", "CHAINMAIL_LEGGINGS", "CHAINMAIL_BOOTS",
         "IRON_HELMET", "IRON_CHESTPLATE", "IRON_LEGGINGS", "IRON_BOOTS",
         "GOLDEN_HELMET", "GOLDEN_CHESTPLATE", "GOLDEN_LEGGINGS", "GOLDEN_BOOTS",
         "DIAMOND_HELMET", "DIAMOND_CHESTPLATE", "DIAMOND_LEGGINGS", "DIAMOND_BOOTS",
         "NETHERITE_HELMET", "NETHERITE_CHESTPLATE", "NETHERITE_LEGGINGS", "NETHERITE_BOOTS",
-        "TURTLE_HELMET", "ARROW", "SPECTRAL_ARROW", "GOLDEN_APPLE", "ENCHANTED_GOLDEN_APPLE",
-        "ENDER_PEARL", "TOTEM_OF_UNDYING"
+        "TURTLE_HELMET"
     );
     private static final List<org.bukkit.entity.EntityType> SPAWNER_TYPES = List.of(
         org.bukkit.entity.EntityType.ZOMBIE, org.bukkit.entity.EntityType.SKELETON, org.bukkit.entity.EntityType.CREEPER,
@@ -362,26 +358,12 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
     }
 
     private double shopPrice(Material material) {
-        if (material != null && PVP_ITEMS.contains(material.name())) return pvpShopPrice(material);
+        if (material != null && ARMOUR_ITEMS.contains(material.name())) return armourShopPrice(material);
         // Keep regular shop prices clean and predictable.
         return Math.round(Math.max(1.0, worth(material) * 2.0) * 100.0) / 100.0;
     }
-    private double pvpShopPrice(Material material) {
+    private double armourShopPrice(Material material) {
         return switch (material.name()) {
-            case "WOODEN_SWORD", "WOODEN_AXE" -> 80;
-            case "STONE_SWORD", "STONE_AXE" -> 160;
-            case "IRON_SWORD" -> 450;
-            case "IRON_AXE" -> 500;
-            case "GOLDEN_SWORD", "GOLDEN_AXE" -> 220;
-            case "DIAMOND_SWORD" -> 1800;
-            case "DIAMOND_AXE" -> 2000;
-            case "NETHERITE_SWORD" -> 6500;
-            case "NETHERITE_AXE" -> 7000;
-            case "SHIELD" -> 350;
-            case "BOW" -> 500;
-            case "CROSSBOW" -> 700;
-            case "TRIDENT" -> 2400;
-            case "MACE" -> 3500;
             case "LEATHER_HELMET" -> 100;
             case "LEATHER_CHESTPLATE" -> 160;
             case "LEATHER_LEGGINGS" -> 140;
@@ -407,12 +389,6 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
             case "NETHERITE_LEGGINGS" -> 7000;
             case "NETHERITE_BOOTS" -> 4500;
             case "TURTLE_HELMET" -> 900;
-            case "ARROW" -> 4;
-            case "SPECTRAL_ARROW" -> 12;
-            case "GOLDEN_APPLE" -> 250;
-            case "ENCHANTED_GOLDEN_APPLE" -> 2500;
-            case "ENDER_PEARL" -> 120;
-            case "TOTEM_OF_UNDYING" -> 4000;
             default -> 500;
         };
     }
@@ -775,10 +751,10 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         h.inv = inv;
         ItemStack filler = button(Material.BLACK_STAINED_GLASS_PANE, ChatColor.DARK_GRAY + " ");
         for (int slot = 0; slot < inv.getSize(); slot++) inv.setItem(slot, filler);
-        Material[] icons = {Material.NETHERITE_SWORD, Material.BRICKS, Material.WHEAT, Material.GOLDEN_APPLE, Material.REDSTONE};
-        String[] cats = {"PvP", "Blocks", "Farming", "Food", "Redstone"};
+        Material[] icons = {Material.DIAMOND_CHESTPLATE, Material.BRICKS, Material.WHEAT, Material.GOLDEN_APPLE, Material.REDSTONE};
+        String[] cats = {"Armour", "Blocks", "Farming", "Food", "Redstone"};
         String[] descriptions = {
-                "Swords, axes, shields, armour and ranged gear",
+                "Protective armour from early-game to Netherite",
                 "Building blocks and decoration",
                 "Seeds, crops and farming supplies",
                 "Food and survival supplies",
@@ -846,7 +822,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
             Material m = items.get(i);
             double price = shopPrice(m);
             inv.setItem(i - start, button(m, ChatColor.YELLOW + nice(m),
-                    ChatColor.GRAY + (category.equals("PvP") ? "Combat equipment" : "Shop item"),
+                    ChatColor.GRAY + (category.equals("Armour") ? "Combat equipment" : "Shop item"),
                     ChatColor.GOLD + "Price: €" + shopMoney(price),
                     ChatColor.GREEN + "Click to choose quantity"));
         }
@@ -863,7 +839,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         String n = m.name();
         return switch (c) {
             case "Blocks" -> COMMON_BLOCKS.contains(n);
-            case "PvP" -> PVP_ITEMS.contains(n);
+            case "Armour" -> ARMOUR_ITEMS.contains(n);
             case "Farming" -> Set.of("WHEAT_SEEDS", "BEETROOT_SEEDS", "MELON_SEEDS", "PUMPKIN_SEEDS",
                     "WHEAT", "CARROT", "POTATO", "BEETROOT", "SUGAR_CANE", "PUMPKIN",
                     "MELON_SLICE", "KELP", "SEA_PICKLE", "PINK_PETALS").contains(n);
