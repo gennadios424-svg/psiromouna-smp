@@ -36,7 +36,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
     private final Map<UUID, Long> pvpTaggedUntil = new HashMap<>();
     private final Set<UUID> afkPlayers = new HashSet<>();
     private static final long AFK_COOLDOWN_MILLIS = 30L * 60L * 1000L;
-    private static final long PVP_TAG_MILLIS = 15_000L;
+    private static final long PVP_TAG_MILLIS = 20_000L;
     private static final String PREFIX = ChatColor.DARK_AQUA + "[SMP] " + ChatColor.RESET;
     private static final Map<Material, Double> DEFAULT_PRICES = new LinkedHashMap<>();
     private static final List<String> COMMON_BLOCKS = List.of(
@@ -250,6 +250,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         openDatabase();
         loadLoadedBannerTitles();
         Bukkit.getScheduler().runTaskTimer(this, this::updateBannerTitleVisibility, 20L, 10L);
+        Bukkit.getScheduler().runTaskTimer(this, this::updateCombatActionBars, 20L, 20L);
         getServer().getPluginManager().registerEvents(this, this);
         if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) new EconomyExpansion(this).register();
         for (String name : List.of("worth", "sell", "shop", "buy", "ah", "balance", "currency", "cmds", "banner", "afk")) {
@@ -1291,7 +1292,23 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
     private void tagForPvp(Player p) {
         if (afkPlayers.contains(p.getUniqueId())) return;
         pvpTaggedUntil.put(p.getUniqueId(), System.currentTimeMillis() + PVP_TAG_MILLIS);
-        p.sendActionBar(ChatColor.RED + "⚔ PVP TAG " + ChatColor.GRAY + "— 15 seconds");
+        p.sendActionBar(ChatColor.RED + "COMBAT: " + ChatColor.WHITE + "20S");
+    }
+
+    private void updateCombatActionBars() {
+        long now = System.currentTimeMillis();
+        for (Player p : Bukkit.getOnlinePlayers()) {
+            Long until = pvpTaggedUntil.get(p.getUniqueId());
+            if (until == null) continue;
+            long remaining = until - now;
+            if (remaining <= 0) {
+                pvpTaggedUntil.remove(p.getUniqueId());
+                p.sendActionBar("");
+                continue;
+            }
+            long seconds = (remaining + 999L) / 1000L;
+            p.sendActionBar(ChatColor.RED + "COMBAT: " + ChatColor.WHITE + seconds + "S");
+        }
     }
     private boolean isAllowedShopCommand(String message) {
         String cmd = message.toLowerCase(Locale.ROOT).split("\\s+", 2)[0];
@@ -1319,7 +1336,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         }
         if (isPvpTagged(p) && !isAllowedShopCommand(e.getMessage())) {
             e.setCancelled(true);
-            p.sendMessage(PREFIX + ChatColor.RED + "You are combat-tagged. Only /shop and /buy are available for 15 seconds after PvP.");
+            p.sendMessage(PREFIX + ChatColor.RED + "You are combat-tagged. Only /shop, /buy and /shardshop are available for 20 seconds after PvP.");
         }
     }
 
@@ -1417,7 +1434,15 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         updateDisplays(p);
     }
 
-    @EventHandler public void onQuit(org.bukkit.event.player.PlayerQuitEvent e) { onQuitCleanup(e.getPlayer()); }
+    @EventHandler public void onQuit(org.bukkit.event.player.PlayerQuitEvent e) {
+        Player p = e.getPlayer();
+        if (isPvpTagged(p) && !p.isDead()) {
+            p.setHealth(0.0);
+            Bukkit.broadcastMessage(ChatColor.RED + p.getName() + " logged out during combat and died.");
+        }
+        p.sendActionBar("");
+        onQuitCleanup(p);
+    }
 
     private void updateDisplays(Player p) {
         double lefta = getBalance(p.getUniqueId(), "lefta");
