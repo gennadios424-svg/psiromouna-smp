@@ -352,7 +352,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         return Math.round(Math.max(1.0, worth(material) * 2.0) * 100.0) / 100.0;
     }
     private String shopMoney(double amount) {
-        return String.format(Locale.US, "%,.2f", amount).replaceAll("\\.00$", "").replaceAll("(\\\\.[0-9])0$", "$1");
+        return String.format(Locale.US, "%,.2f", amount).replaceAll("\\.00$", "").replaceAll("(\\.[0-9])0$", "$1");
     }
 
     @Override public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
