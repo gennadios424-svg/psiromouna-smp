@@ -17,6 +17,9 @@ commands:
     description: Open the item shop.
     aliases: [buy]
     usage: /buy
+  shardshop:
+    description: Open the rare Shard Shop.
+    usage: /shardshop
   ah:
     description: Player auction house.
     usage: /ah [sell <price>|buy <id>|cancel <id>]
