@@ -405,6 +405,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
 
         switch (name) {
             case "cmds" -> { openCommands(p); return true; }
+            case "shardshop" -> { openShardShop(p); return true; }
             case "worth" -> {
                 if (args.length == 0) { openWorth(p); return true; }
                 if (args[0].equalsIgnoreCase("search")) {
@@ -768,6 +769,22 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         p.openInventory(inv);
     }
 
+    private void openShardShop(Player p) {
+        MenuHolder h = new MenuHolder("shard-shop");
+        Inventory inv = Bukkit.createInventory(h, 27, ChatColor.DARK_PURPLE + "✦ SHARD SHOP ✦");
+        h.inv = inv;
+        ItemStack filler = button(Material.PURPLE_STAINED_GLASS_PANE, ChatColor.DARK_GRAY + " ");
+        for (int slot = 0; slot < inv.getSize(); slot++) inv.setItem(slot, filler);
+        inv.setItem(13, button(Material.TOTEM_OF_UNDYING,
+                ChatColor.LIGHT_PURPLE + "" + ChatColor.BOLD + "Totem of Undying",
+                ChatColor.GRAY + "A rare survival item",
+                ChatColor.AQUA + "Price: 2,000 Shards",
+                ChatColor.GREEN + "Click to purchase"));
+        inv.setItem(22, button(Material.BOOK, ChatColor.YELLOW + "Your balance",
+                ChatColor.AQUA + money(getBalance(p.getUniqueId(), "shards")) + " Shards"));
+        p.openInventory(inv);
+    }
+
     private void openCommands(Player p) {
         MenuHolder h=new MenuHolder("commands"); Inventory inv=Bukkit.createInventory(h,27,ChatColor.DARK_AQUA+"Psiromouna Commands"); h.inv=inv;
         inv.setItem(10,button(Material.EMERALD,ChatColor.GREEN+"/balance","View Lefta and Shards"));
@@ -776,6 +793,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         inv.setItem(13,button(Material.HOPPER,ChatColor.GREEN+"/sell","Open sell chest"));
         inv.setItem(14,button(Material.CHEST,ChatColor.LIGHT_PURPLE+"/ah","Auction house"));
         inv.setItem(15,button(Material.WHITE_BANNER,ChatColor.LIGHT_PURPLE+"/banner","Create and manage your floating banner title"));
+        inv.setItem(16,button(Material.AMETHYST_SHARD,ChatColor.LIGHT_PURPLE+"/shardshop","Rare items purchased with Shards"));
         p.openInventory(inv);
     }
     private void openSell(Player p) {
@@ -1045,7 +1063,25 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         if(e.getRawSlot()<0||e.getRawSlot()>=e.getInventory().getSize()) return;
         ItemStack clicked=e.getCurrentItem(); if(clicked==null||clicked.getType().isAir()) return;
 
-        if(h.type.equals("commands")) { int slot=e.getRawSlot(); String[] cmds={"/balance","/buy","/worth","/sell","/ah","/banner"}; if(slot>=10&&slot<=15)p.performCommand(cmds[slot-10].substring(1)); return; }
+        if(h.type.equals("commands")) { int slot=e.getRawSlot(); String[] cmds={"/balance","/buy","/worth","/sell","/ah","/banner","/shardshop"}; if(slot>=10&&slot<=16)p.performCommand(cmds[slot-10].substring(1)); return; }
+        if (h.type.equals("shard-shop")) {
+            if (e.getRawSlot() != 13) return;
+            final double price = 2000.0;
+            if (getBalance(p.getUniqueId(), "shards") + 0.000001 < price) {
+                p.sendMessage(PREFIX + ChatColor.RED + "You need 2,000 Shards to buy a Totem of Undying.");
+                return;
+            }
+            ItemStack totem = new ItemStack(Material.TOTEM_OF_UNDYING, 1);
+            if (!canFit(p, totem)) {
+                p.sendMessage(PREFIX + ChatColor.RED + "Your inventory is full.");
+                return;
+            }
+            changeBalance(p.getUniqueId(), "shards", -price);
+            p.getInventory().addItem(totem);
+            p.sendMessage(PREFIX + ChatColor.GREEN + "Purchased a Totem of Undying for 2,000 Shards.");
+            p.closeInventory();
+            return;
+        }
         if (h.type.equals("shop-categories")) {
             int slot = e.getRawSlot();
             String[] cats = {"Armour", "Blocks", "Farming", "Food", "Redstone"};
@@ -1259,7 +1295,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
     }
     private boolean isAllowedShopCommand(String message) {
         String cmd = message.toLowerCase(Locale.ROOT).split("\\s+", 2)[0];
-        return cmd.equals("/shop") || cmd.equals("/buy") || cmd.equals("/psiromounasmp:shop") || cmd.equals("/psiromounasmp:buy");
+        return cmd.equals("/shop") || cmd.equals("/buy") || cmd.equals("/shardshop") || cmd.equals("/psiromounasmp:shop") || cmd.equals("/psiromounasmp:buy") || cmd.equals("/psiromounasmp:shardshop");
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -1358,13 +1394,13 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
     public void onPvpTaggedInventory(InventoryClickEvent e) {
         if (!(e.getWhoClicked() instanceof Player p) || !isPvpTagged(p)) return;
         if (!(e.getView().getTopInventory().getHolder() instanceof MenuHolder holder) ||
-                !(holder.type.equals("shop-categories") || holder.type.equals("shop-items") || holder.type.equals("spawner-types") || holder.type.equals("buy-quantity"))) e.setCancelled(true);
+                !(holder.type.equals("shop-categories") || holder.type.equals("shop-items") || holder.type.equals("spawner-types") || holder.type.equals("buy-quantity") || holder.type.equals("shard-shop"))) e.setCancelled(true);
     }
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onPvpTaggedInventoryDrag(org.bukkit.event.inventory.InventoryDragEvent e) {
         if (!(e.getWhoClicked() instanceof Player p) || !isPvpTagged(p)) return;
         if (!(e.getView().getTopInventory().getHolder() instanceof MenuHolder holder) ||
-                !(holder.type.equals("shop-categories") || holder.type.equals("shop-items") || holder.type.equals("spawner-types") || holder.type.equals("buy-quantity"))) e.setCancelled(true);
+                !(holder.type.equals("shop-categories") || holder.type.equals("shop-items") || holder.type.equals("spawner-types") || holder.type.equals("buy-quantity") || holder.type.equals("shard-shop"))) e.setCancelled(true);
     }
 
     private void onQuitCleanup(Player p) {
