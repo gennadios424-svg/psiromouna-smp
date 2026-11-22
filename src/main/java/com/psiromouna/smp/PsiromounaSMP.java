@@ -348,11 +348,11 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
     }
 
     private double shopPrice(Material material) {
-        double base = Math.max(1.0, worth(material) * 2.0);
-        return Math.round((base + (material.ordinal() + 1) / 10000.0) * 10000.0) / 10000.0;
+        // Keep shop prices clean and predictable; do not add ordinal-based fractions.
+        return Math.round(Math.max(1.0, worth(material) * 2.0) * 100.0) / 100.0;
     }
     private String shopMoney(double amount) {
-        return String.format(Locale.US, "%,.4f", amount).replaceAll("0+$", "").replaceAll("\\.$", "");
+        return String.format(Locale.US, "%,.2f", amount).replaceAll("\\.00$", "").replaceAll("(\\\\.[0-9])0$", "$1");
     }
 
     @Override public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
@@ -1325,16 +1325,15 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         Objective obj = board.registerNewObjective("smpinfo", Criteria.DUMMY, pink + "" + ChatColor.BOLD + "✦ PSIROMOUNA ✦");
         obj.setDisplaySlot(DisplaySlot.SIDEBAR);
         String[] lines = {
-                ChatColor.GRAY + "" + ChatColor.BOLD + "ONLINE",
-                ChatColor.WHITE + "" + Bukkit.getOnlinePlayers().size() + "/" + Bukkit.getMaxPlayers(),
-                ChatColor.DARK_GRAY + " ",
-                ChatColor.GRAY + "" + ChatColor.BOLD + "YOUR BALANCE",
-                ChatColor.WHITE + "Lefta: " + ChatColor.GOLD + "€" + money(lefta),
-                ChatColor.WHITE + "✦ " + ChatColor.AQUA + money(shards) + " Shards",
-                ChatColor.DARK_GRAY + "psiromouna SMP"
+                ChatColor.GOLD + "€ " + money(lefta) + " Lefta",
+                ChatColor.AQUA + "✦ " + money(shards) + " Shards"
         };
         int score = lines.length;
-        for (String line : lines) obj.getScore(line).setScore(score--);
+        for (String line : lines) {
+            Score sidebarLine = obj.getScore(line);
+            sidebarLine.setScore(score--);
+            sidebarLine.setNumberFormat(NumberFormat.blank());
+        }
         for (Player target : Bukkit.getOnlinePlayers()) {
             String teamId = "cash" + target.getUniqueId().toString().replace("-", "").substring(0, 8);
             Team nameTag = board.registerNewTeam(teamId);
