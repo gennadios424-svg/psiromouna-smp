@@ -190,6 +190,19 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         "PUMPKIN",
         "MELON"
     );
+    private static final Set<String> PVP_ITEMS = Set.of(
+        "WOODEN_SWORD", "STONE_SWORD", "IRON_SWORD", "GOLDEN_SWORD", "DIAMOND_SWORD", "NETHERITE_SWORD",
+        "WOODEN_AXE", "STONE_AXE", "IRON_AXE", "GOLDEN_AXE", "DIAMOND_AXE", "NETHERITE_AXE",
+        "SHIELD", "BOW", "CROSSBOW", "TRIDENT", "MACE",
+        "LEATHER_HELMET", "LEATHER_CHESTPLATE", "LEATHER_LEGGINGS", "LEATHER_BOOTS",
+        "CHAINMAIL_HELMET", "CHAINMAIL_CHESTPLATE", "CHAINMAIL_LEGGINGS", "CHAINMAIL_BOOTS",
+        "IRON_HELMET", "IRON_CHESTPLATE", "IRON_LEGGINGS", "IRON_BOOTS",
+        "GOLDEN_HELMET", "GOLDEN_CHESTPLATE", "GOLDEN_LEGGINGS", "GOLDEN_BOOTS",
+        "DIAMOND_HELMET", "DIAMOND_CHESTPLATE", "DIAMOND_LEGGINGS", "DIAMOND_BOOTS",
+        "NETHERITE_HELMET", "NETHERITE_CHESTPLATE", "NETHERITE_LEGGINGS", "NETHERITE_BOOTS",
+        "TURTLE_HELMET", "ARROW", "SPECTRAL_ARROW", "GOLDEN_APPLE", "ENCHANTED_GOLDEN_APPLE",
+        "ENDER_PEARL", "TOTEM_OF_UNDYING"
+    );
     private static final List<org.bukkit.entity.EntityType> SPAWNER_TYPES = List.of(
         org.bukkit.entity.EntityType.ZOMBIE, org.bukkit.entity.EntityType.SKELETON, org.bukkit.entity.EntityType.CREEPER,
         org.bukkit.entity.EntityType.SPIDER, org.bukkit.entity.EntityType.CAVE_SPIDER, org.bukkit.entity.EntityType.ENDERMAN,
@@ -348,8 +361,59 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
     }
 
     private double shopPrice(Material material) {
-        // Keep shop prices clean and predictable; do not add ordinal-based fractions.
+        if (material != null && PVP_ITEMS.contains(material.name())) return pvpShopPrice(material);
+        // Keep regular shop prices clean and predictable.
         return Math.round(Math.max(1.0, worth(material) * 2.0) * 100.0) / 100.0;
+    }
+    private double pvpShopPrice(Material material) {
+        return switch (material.name()) {
+            case "WOODEN_SWORD", "WOODEN_AXE" -> 80;
+            case "STONE_SWORD", "STONE_AXE" -> 160;
+            case "IRON_SWORD" -> 450;
+            case "IRON_AXE" -> 500;
+            case "GOLDEN_SWORD", "GOLDEN_AXE" -> 220;
+            case "DIAMOND_SWORD" -> 1800;
+            case "DIAMOND_AXE" -> 2000;
+            case "NETHERITE_SWORD" -> 6500;
+            case "NETHERITE_AXE" -> 7000;
+            case "SHIELD" -> 350;
+            case "BOW" -> 500;
+            case "CROSSBOW" -> 700;
+            case "TRIDENT" -> 2400;
+            case "MACE" -> 3500;
+            case "LEATHER_HELMET" -> 100;
+            case "LEATHER_CHESTPLATE" -> 160;
+            case "LEATHER_LEGGINGS" -> 140;
+            case "LEATHER_BOOTS" -> 90;
+            case "CHAINMAIL_HELMET" -> 280;
+            case "CHAINMAIL_CHESTPLATE" -> 450;
+            case "CHAINMAIL_LEGGINGS" -> 400;
+            case "CHAINMAIL_BOOTS" -> 250;
+            case "IRON_HELMET" -> 450;
+            case "IRON_CHESTPLATE" -> 750;
+            case "IRON_LEGGINGS" -> 650;
+            case "IRON_BOOTS" -> 400;
+            case "GOLDEN_HELMET" -> 250;
+            case "GOLDEN_CHESTPLATE" -> 400;
+            case "GOLDEN_LEGGINGS" -> 350;
+            case "GOLDEN_BOOTS" -> 220;
+            case "DIAMOND_HELMET" -> 1500;
+            case "DIAMOND_CHESTPLATE" -> 2500;
+            case "DIAMOND_LEGGINGS" -> 2200;
+            case "DIAMOND_BOOTS" -> 1300;
+            case "NETHERITE_HELMET" -> 5000;
+            case "NETHERITE_CHESTPLATE" -> 8000;
+            case "NETHERITE_LEGGINGS" -> 7000;
+            case "NETHERITE_BOOTS" -> 4500;
+            case "TURTLE_HELMET" -> 900;
+            case "ARROW" -> 4;
+            case "SPECTRAL_ARROW" -> 12;
+            case "GOLDEN_APPLE" -> 250;
+            case "ENCHANTED_GOLDEN_APPLE" -> 2500;
+            case "ENDER_PEARL" -> 120;
+            case "TOTEM_OF_UNDYING" -> 4000;
+            default -> 500;
+        };
     }
     private String shopMoney(double amount) {
         return String.format(Locale.US, "%,.2f", amount).replaceAll("\\.00$", "").replaceAll("(\\.[0-9])0$", "$1");
@@ -705,10 +769,25 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         };
     }
     private void openShop(Player p) {
-        MenuHolder h=new MenuHolder("shop-categories"); Inventory inv=Bukkit.createInventory(h,27,ChatColor.DARK_BLUE+"PSIROMOUNA STORE"); h.inv=inv;
-        Material[] icons={Material.IRON_SWORD,Material.BRICKS,Material.WHEAT,Material.SPAWNER,Material.COOKED_BEEF,Material.REDSTONE};
-        String[] cats={"PvP","Blocks","Farming","Spawners","Food","Redstone"};
-        for(int i=0;i<cats.length;i++) inv.setItem(10+i,button(icons[i],ChatColor.AQUA+cats[i],ChatColor.GRAY+"Browse "+cats[i]));
+        MenuHolder h = new MenuHolder("shop-categories");
+        Inventory inv = Bukkit.createInventory(h, 27, ChatColor.DARK_BLUE + "✦ PSIROMOUNA STORE ✦");
+        h.inv = inv;
+        ItemStack filler = button(Material.BLACK_STAINED_GLASS_PANE, ChatColor.DARK_GRAY + " ");
+        for (int slot = 0; slot < inv.getSize(); slot++) inv.setItem(slot, filler);
+        Material[] icons = {Material.NETHERITE_SWORD, Material.BRICKS, Material.WHEAT, Material.GOLDEN_APPLE, Material.REDSTONE};
+        String[] cats = {"PvP", "Blocks", "Farming", "Food", "Redstone"};
+        String[] descriptions = {
+                "Swords, axes, shields, armour and ranged gear",
+                "Building blocks and decoration",
+                "Seeds, crops and farming supplies",
+                "Food and survival supplies",
+                "Redstone components and machinery"
+        };
+        int[] slots = {10, 12, 14, 16, 22};
+        for (int i = 0; i < cats.length; i++) {
+            inv.setItem(slots[i], button(icons[i], ChatColor.AQUA + "" + ChatColor.BOLD + cats[i],
+                    ChatColor.GRAY + descriptions[i], ChatColor.YELLOW + "Click to browse"));
+        }
         p.openInventory(inv);
     }
 
@@ -766,11 +845,13 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
             Material m = items.get(i);
             double price = shopPrice(m);
             inv.setItem(i - start, button(m, ChatColor.YELLOW + nice(m),
-                    ChatColor.GRAY + "Worth: €" + money(worth(m)),
+                    ChatColor.GRAY + (category.equals("PvP") ? "Combat equipment" : "Shop item"),
                     ChatColor.GOLD + "Price: €" + shopMoney(price),
                     ChatColor.GREEN + "Click to choose quantity"));
         }
-        inv.setItem(45, button(Material.ARROW, ChatColor.RED + "Back", "Categories"));
+        ItemStack filler = button(Material.BLACK_STAINED_GLASS_PANE, ChatColor.DARK_GRAY + " ");
+        for (int slot = 45; slot < 54; slot++) inv.setItem(slot, filler);
+        inv.setItem(45, button(Material.ARROW, ChatColor.RED + "Back", "Shop categories"));
         if (current > 0) inv.setItem(48, button(Material.SPECTRAL_ARROW, ChatColor.YELLOW + "Previous page"));
         inv.setItem(49, button(Material.PAPER, ChatColor.GOLD + "Page " + (current + 1) + "/" + pages, "Items: " + items.size()));
         if (current + 1 < pages) inv.setItem(50, button(Material.SPECTRAL_ARROW, ChatColor.GREEN + "Next page"));
@@ -781,7 +862,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         String n = m.name();
         return switch (c) {
             case "Blocks" -> COMMON_BLOCKS.contains(n);
-            case "PvP" -> Set.of("IRON_HELMET", "IRON_CHESTPLATE", "IRON_LEGGINGS", "IRON_BOOTS").contains(n);
+            case "PvP" -> PVP_ITEMS.contains(n);
             case "Farming" -> Set.of("WHEAT_SEEDS", "BEETROOT_SEEDS", "MELON_SEEDS", "PUMPKIN_SEEDS",
                     "WHEAT", "CARROT", "POTATO", "BEETROOT", "SUGAR_CANE", "PUMPKIN",
                     "MELON_SLICE", "KELP", "SEA_PICKLE", "PINK_PETALS").contains(n);
@@ -839,6 +920,8 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         MenuHolder h = new MenuHolder("buy-quantity", category, 0, material, spawnerType, unitPrice, currency);
         Inventory inv = Bukkit.createInventory(h, 27, ChatColor.DARK_GREEN + "Choose quantity");
         h.inv = inv;
+        ItemStack filler = button(Material.CYAN_STAINED_GLASS_PANE, ChatColor.DARK_GRAY + " ");
+        for (int slot = 0; slot < inv.getSize(); slot++) inv.setItem(slot, filler);
         int[] amounts = {1, 16, 32, 64};
         for (int i = 0; i < amounts.length; i++) {
             int amount = amounts[i];
@@ -986,7 +1069,18 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         ItemStack clicked=e.getCurrentItem(); if(clicked==null||clicked.getType().isAir()) return;
 
         if(h.type.equals("commands")) { int slot=e.getRawSlot(); String[] cmds={"/balance","/buy","/worth","/sell","/ah","/banner"}; if(slot>=10&&slot<=15)p.performCommand(cmds[slot-10].substring(1)); return; }
-        if(h.type.equals("shop-categories")) { String[] cats={"PvP","Blocks","Farming","Spawners","Food","Redstone"};int ix=e.getRawSlot()-10;if(ix>=0&&ix<6){if(ix==3)openSpawnerShop(p);else openShopCategory(p,cats[ix]);}return; }
+        if (h.type.equals("shop-categories")) {
+            int slot = e.getRawSlot();
+            String[] cats = {"PvP", "Blocks", "Farming", "Food", "Redstone"};
+            int[] categorySlots = {10, 12, 14, 16, 22};
+            for (int i = 0; i < categorySlots.length; i++) {
+                if (slot == categorySlots[i]) {
+                    openShopCategory(p, cats[i]);
+                    return;
+                }
+            }
+            return;
+        }
         if(h.type.equals("shop-items")) {
             int slot = e.getRawSlot();
             if (slot == 45) { openShop(p); return; }
