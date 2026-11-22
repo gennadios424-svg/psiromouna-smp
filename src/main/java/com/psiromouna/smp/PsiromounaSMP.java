@@ -1048,7 +1048,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         if(h.type.equals("commands")) { int slot=e.getRawSlot(); String[] cmds={"/balance","/buy","/worth","/sell","/ah","/banner"}; if(slot>=10&&slot<=15)p.performCommand(cmds[slot-10].substring(1)); return; }
         if (h.type.equals("shop-categories")) {
             int slot = e.getRawSlot();
-            String[] cats = {"PvP", "Blocks", "Farming", "Food", "Redstone"};
+            String[] cats = {"Armour", "Blocks", "Farming", "Food", "Redstone"};
             int[] categorySlots = {10, 12, 14, 16, 22};
             for (int i = 0; i < categorySlots.length; i++) {
                 if (slot == categorySlots[i]) {
