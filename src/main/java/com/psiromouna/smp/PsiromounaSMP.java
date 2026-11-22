@@ -17,6 +17,7 @@ import org.bukkit.inventory.meta.BlockStateMeta;
 import org.bukkit.block.CreatureSpawner;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scoreboard.*;
+import io.papermc.paper.scoreboard.numbers.NumberFormat;
 import org.bukkit.util.io.BukkitObjectInputStream;
 import org.bukkit.util.io.BukkitObjectOutputStream;
 import org.bukkit.scheduler.BukkitTask;
@@ -1426,7 +1427,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         for (String line : lines) {
             Score sidebarLine = obj.getScore(line);
             sidebarLine.setScore(score--);
-            sidebarLine.setNumberFormat(NumberFormat.blank());
+            sidebarLine.numberFormat(NumberFormat.blank());
         }
         for (Player target : Bukkit.getOnlinePlayers()) {
             String teamId = "cash" + target.getUniqueId().toString().replace("-", "").substring(0, 8);
