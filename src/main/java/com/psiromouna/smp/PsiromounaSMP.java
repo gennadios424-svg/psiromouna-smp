@@ -191,14 +191,12 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         "PUMPKIN",
         "MELON"
     );
-    private static final Set<String> ARMOUR_ITEMS = Set.of(
-        "LEATHER_HELMET", "LEATHER_CHESTPLATE", "LEATHER_LEGGINGS", "LEATHER_BOOTS",
+    private static final Set<String> COMBAT_ITEMS = Set.of(
         "CHAINMAIL_HELMET", "CHAINMAIL_CHESTPLATE", "CHAINMAIL_LEGGINGS", "CHAINMAIL_BOOTS",
         "IRON_HELMET", "IRON_CHESTPLATE", "IRON_LEGGINGS", "IRON_BOOTS",
-        "GOLDEN_HELMET", "GOLDEN_CHESTPLATE", "GOLDEN_LEGGINGS", "GOLDEN_BOOTS",
-        "DIAMOND_HELMET", "DIAMOND_CHESTPLATE", "DIAMOND_LEGGINGS", "DIAMOND_BOOTS",
-        "NETHERITE_HELMET", "NETHERITE_CHESTPLATE", "NETHERITE_LEGGINGS", "NETHERITE_BOOTS",
-        "TURTLE_HELMET"
+        "WOODEN_SWORD", "STONE_SWORD", "IRON_SWORD", "GOLDEN_SWORD", "DIAMOND_SWORD",
+        "WOODEN_AXE", "STONE_AXE", "IRON_AXE", "GOLDEN_AXE", "DIAMOND_AXE",
+        "BOW", "CROSSBOW", "SHIELD", "TRIDENT"
     );
     private static final List<org.bukkit.entity.EntityType> SPAWNER_TYPES = List.of(
         org.bukkit.entity.EntityType.ZOMBIE, org.bukkit.entity.EntityType.SKELETON, org.bukkit.entity.EntityType.CREEPER,
@@ -359,7 +357,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
     }
 
     private double shopPrice(Material material) {
-        if (material != null && ARMOUR_ITEMS.contains(material.name())) return armourShopPrice(material);
+        if (material != null && COMBAT_ITEMS.contains(material.name())) return armourShopPrice(material);
         // Keep regular shop prices clean and predictable.
         return Math.round(Math.max(1.0, worth(material) * 2.0) * 100.0) / 100.0;
     }
@@ -753,10 +751,10 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         h.inv = inv;
         ItemStack filler = button(Material.BLACK_STAINED_GLASS_PANE, ChatColor.DARK_GRAY + " ");
         for (int slot = 0; slot < inv.getSize(); slot++) inv.setItem(slot, filler);
-        Material[] icons = {Material.DIAMOND_CHESTPLATE, Material.BRICKS, Material.WHEAT, Material.GOLDEN_APPLE, Material.REDSTONE};
-        String[] cats = {"Armour", "Blocks", "Farming", "Food", "Redstone"};
+        Material[] icons = {Material.IRON_SWORD, Material.BRICKS, Material.WHEAT, Material.GOLDEN_APPLE, Material.REDSTONE};
+        String[] cats = {"Combat", "Blocks", "Farming", "Food", "Redstone"};
         String[] descriptions = {
-                "Protective armour from early-game to Netherite",
+                "Weapons plus chainmail and iron armour",
                 "Building blocks and decoration",
                 "Seeds, crops and farming supplies",
                 "Food and survival supplies",
@@ -776,12 +774,27 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         h.inv = inv;
         ItemStack filler = button(Material.PURPLE_STAINED_GLASS_PANE, ChatColor.DARK_GRAY + " ");
         for (int slot = 0; slot < inv.getSize(); slot++) inv.setItem(slot, filler);
-        inv.setItem(13, button(Material.TOTEM_OF_UNDYING,
-                ChatColor.LIGHT_PURPLE + "" + ChatColor.BOLD + "Totem of Undying",
-                ChatColor.GRAY + "A rare survival item",
-                ChatColor.AQUA + "Price: 2,000 Shards",
-                ChatColor.GREEN + "Click to purchase"));
-        inv.setItem(22, button(Material.BOOK, ChatColor.YELLOW + "Your balance",
+        Material[] rare = {Material.NETHERITE_HELMET, Material.NETHERITE_CHESTPLATE,
+                Material.NETHERITE_LEGGINGS, Material.NETHERITE_BOOTS, Material.TOTEM_OF_UNDYING};
+        String[] names = {"Enchanted Netherite Helmet", "Enchanted Netherite Chestplate",
+                "Enchanted Netherite Leggings", "Enchanted Netherite Boots", "Totem of Undying"};
+        double[] prices = {5000, 8000, 7000, 4500, 2000};
+        int[] slots = {10, 12, 14, 16, 22};
+        for (int i=0;i<rare.length;i++) {
+            ItemStack display = button(rare[i], ChatColor.LIGHT_PURPLE + "" + ChatColor.BOLD + names[i],
+                    ChatColor.AQUA + "Price: " + money(prices[i]) + " Shards",
+                    ChatColor.GREEN + "Click to purchase");
+            if (i < 4) {
+                ItemMeta meta = display.getItemMeta();
+                meta.addEnchant(org.bukkit.enchantments.Enchantment.PROTECTION, 4, true);
+                meta.addEnchant(org.bukkit.enchantments.Enchantment.UNBREAKING, 3, true);
+                if (i == 0) meta.addEnchant(org.bukkit.enchantments.Enchantment.RESPIRATION, 3, true);
+                if (i == 3) meta.addEnchant(org.bukkit.enchantments.Enchantment.FEATHER_FALLING, 4, true);
+                display.setItemMeta(meta);
+            }
+            inv.setItem(slots[i], display);
+        }
+        inv.setItem(4, button(Material.BOOK, ChatColor.YELLOW + "Your balance",
                 ChatColor.AQUA + money(getBalance(p.getUniqueId(), "shards")) + " Shards"));
         p.openInventory(inv);
     }
@@ -841,7 +854,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
             Material m = items.get(i);
             double price = shopPrice(m);
             inv.setItem(i - start, button(m, ChatColor.YELLOW + nice(m),
-                    ChatColor.GRAY + (category.equals("Armour") ? "Combat equipment" : "Shop item"),
+                    ChatColor.GRAY + (category.equals("Combat") ? "Weapons and iron/chainmail armour" : "Shop item"),
                     ChatColor.GOLD + "Price: €" + shopMoney(price),
                     ChatColor.GREEN + "Click to choose quantity"));
         }
@@ -858,7 +871,7 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
         String n = m.name();
         return switch (c) {
             case "Blocks" -> COMMON_BLOCKS.contains(n);
-            case "Armour" -> ARMOUR_ITEMS.contains(n);
+            case "Combat" -> COMBAT_ITEMS.contains(n);
             case "Farming" -> Set.of("WHEAT_SEEDS", "BEETROOT_SEEDS", "MELON_SEEDS", "PUMPKIN_SEEDS",
                     "WHEAT", "CARROT", "POTATO", "BEETROOT", "SUGAR_CANE", "PUMPKIN",
                     "MELON_SLICE", "KELP", "SEA_PICKLE", "PINK_PETALS").contains(n);
@@ -1066,26 +1079,41 @@ public final class PsiromounaSMP extends JavaPlugin implements Listener, TabComp
 
         if(h.type.equals("commands")) { int slot=e.getRawSlot(); String[] cmds={"/balance","/buy","/worth","/sell","/ah","/banner","/shardshop"}; if(slot>=10&&slot<=16)p.performCommand(cmds[slot-10].substring(1)); return; }
         if (h.type.equals("shard-shop")) {
-            if (e.getRawSlot() != 13) return;
-            final double price = 2000.0;
+            int slot = e.getRawSlot();
+            Material[] rare = {Material.NETHERITE_HELMET, Material.NETHERITE_CHESTPLATE,
+                    Material.NETHERITE_LEGGINGS, Material.NETHERITE_BOOTS, Material.TOTEM_OF_UNDYING};
+            double[] prices = {5000, 8000, 7000, 4500, 2000};
+            int[] slots = {10, 12, 14, 16, 22};
+            int index = -1;
+            for (int i=0;i<slots.length;i++) if (slots[i] == slot) index=i;
+            if (index < 0) return;
+            double price = prices[index];
             if (getBalance(p.getUniqueId(), "shards") + 0.000001 < price) {
-                p.sendMessage(PREFIX + ChatColor.RED + "You need 2,000 Shards to buy a Totem of Undying.");
+                p.sendMessage(PREFIX + ChatColor.RED + "Not enough Shards. Required: " + money(price) + ".");
                 return;
             }
-            ItemStack totem = new ItemStack(Material.TOTEM_OF_UNDYING, 1);
-            if (!canFit(p, totem)) {
+            ItemStack item = new ItemStack(rare[index]);
+            if (index < 4) {
+                ItemMeta meta = item.getItemMeta();
+                meta.addEnchant(org.bukkit.enchantments.Enchantment.PROTECTION, 4, true);
+                meta.addEnchant(org.bukkit.enchantments.Enchantment.UNBREAKING, 3, true);
+                if (index == 0) meta.addEnchant(org.bukkit.enchantments.Enchantment.RESPIRATION, 3, true);
+                if (index == 3) meta.addEnchant(org.bukkit.enchantments.Enchantment.FEATHER_FALLING, 4, true);
+                item.setItemMeta(meta);
+            }
+            if (!canFit(p, item)) {
                 p.sendMessage(PREFIX + ChatColor.RED + "Your inventory is full.");
                 return;
             }
             changeBalance(p.getUniqueId(), "shards", -price);
-            p.getInventory().addItem(totem);
-            p.sendMessage(PREFIX + ChatColor.GREEN + "Purchased a Totem of Undying for 2,000 Shards.");
+            p.getInventory().addItem(item);
+            p.sendMessage(PREFIX + ChatColor.GREEN + "Purchased " + nice(rare[index]) + " for " + money(price) + " Shards.");
             p.closeInventory();
             return;
         }
         if (h.type.equals("shop-categories")) {
             int slot = e.getRawSlot();
-            String[] cats = {"Armour", "Blocks", "Farming", "Food", "Redstone"};
+            String[] cats = {"Combat", "Blocks", "Farming", "Food", "Redstone"};
             int[] categorySlots = {10, 12, 14, 16, 22};
             for (int i = 0; i < categorySlots.length; i++) {
                 if (slot == categorySlots[i]) {
